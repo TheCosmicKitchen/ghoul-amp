@@ -138,7 +138,7 @@
   <div class="row" id="classics" role="group" aria-label="Winamp classic visualizers"></div>
 </section>
 
-<div id="hint">H party mode · F fullscreen · N next scene · W classics · X classic shuffle · S spooky shuffle · 1-9 and Shift+1-7 pick a scene</div>
+<div id="hint">H party mode · F fullscreen · N next scene · W classics · X classic shuffle · S spooky shuffle · 1-9 and Shift+1-8 pick a scene</div>
 
 <script>
 // Paste your playlist link or ID here so it loads for everyone without pasting it in.
@@ -369,7 +369,119 @@ function drawBats(t, dt, color) {
 /* ---------- scenes ---------- */
 const DANCERS = 5, headPop = new Array(DANCERS).fill(0);
 let danceStep = 0, dancePhase = 0, houseLit = 0, wispCall = 0;
-let silentCard = 0, twinsAt = 0, tapeFlash = 0, ringBurst = 0, followShift = 0, grinJolt = 0, nunStare = 0;
+// The old Windows maze screensaver, with company.
+const MAZE = 21, RAYS = 320, MAZE_PLANE = .66, BEHIND = 9;
+const mz = { grid: null, route: [], pi: 0, mi: 0, yaw: 0, look: 0, lookUntil: 0, nextLook: 12, caught: -99, grace: 0, zbuf: new Float32Array(RAYS) };
+
+function buildMaze() {
+  const g = Array.from({ length: MAZE }, () => new Uint8Array(MAZE).fill(1));
+  const stack = [[1, 1]];
+  g[1][1] = 0;
+  while (stack.length) {
+    const [x, y] = stack[stack.length - 1];
+    const open = [[2, 0], [-2, 0], [0, 2], [0, -2]].filter(([dx, dy]) => {
+      const a = x + dx, b = y + dy;
+      return a > 0 && b > 0 && a < MAZE - 1 && b < MAZE - 1 && g[b][a];
+    });
+    if (!open.length) { stack.pop(); continue; }
+    const [dx, dy] = open[Math.floor(rnd(0, open.length))];
+    g[y + dy / 2][x + dx / 2] = 0;
+    g[y + dy][x + dx] = 0;
+    stack.push([x + dx, y + dy]);
+  }
+  // Knock through some walls so there are loops to be chased around.
+  for (let i = 0; i < 60; i++) {
+    const x = 1 + Math.floor(rnd(0, MAZE - 2)), y = 1 + Math.floor(rnd(0, MAZE - 2));
+    if ((x + y) % 2) g[y][x] = 0;
+  }
+  return g;
+}
+
+function mazePath([sx, sy], [tx, ty]) {
+  const from = new Map([[sx + sy * MAZE, -1]]), queue = [[sx, sy]];
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    if (x === tx && y === ty) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const key = x + dx + (y + dy) * MAZE;
+      if (mz.grid[y + dy][x + dx] || from.has(key)) continue;
+      from.set(key, x + y * MAZE);
+      queue.push([x + dx, y + dy]);
+    }
+  }
+  const path = [];
+  for (let key = tx + ty * MAZE; key !== -1; key = from.get(key)) path.unshift([key % MAZE, Math.floor(key / MAZE)]);
+  return path;
+}
+
+function extendRoute() {
+  const end = mz.route[mz.route.length - 1];
+  let x, y;
+  do {
+    x = 1 + 2 * Math.floor(rnd(0, (MAZE - 1) / 2));
+    y = 1 + 2 * Math.floor(rnd(0, (MAZE - 1) / 2));
+  } while (Math.abs(x - end[0]) + Math.abs(y - end[1]) < 12);
+  mz.route.push(...mazePath(end, [x, y]).slice(1));
+}
+
+function startMaze() {
+  mz.grid = buildMaze();
+  mz.route = [[1, 1]];
+  while (mz.route.length < 40) extendRoute();
+  mz.pi = BEHIND + 1; mz.mi = 1;
+  const [ax, ay] = mazePoint(mz.pi), [bx, by] = mazePoint(mz.pi + .6);
+  mz.yaw = Math.atan2(by - ay, bx - ax);
+}
+
+function mazePoint(i) {
+  const n = Math.min(Math.floor(i), mz.route.length - 2), f = i - n, a = mz.route[n], b = mz.route[n + 1];
+  return [a[0] + (b[0] - a[0]) * f + .5, a[1] + (b[1] - a[1]) * f + .5];
+}
+
+function mazeSees(ax, ay, bx, by) {
+  const steps = Math.ceil(Math.hypot(bx - ax, by - ay) * 4);
+  for (let i = 1; i < steps; i++) {
+    const q = i / steps;
+    if (mz.grid[Math.floor(ay + (by - ay) * q)][Math.floor(ax + (bx - ax) * q)]) return false;
+  }
+  return true;
+}
+
+const brick = document.createElement('canvas');
+brick.width = brick.height = 64;
+{
+  const b = brick.getContext('2d');
+  b.fillStyle = '#6a635a'; b.fillRect(0, 0, 64, 64);
+  for (let r = 0; r < 6; r++) for (let i = -1; i < 3; i++) {
+    const shade = 92 + Math.floor(Math.random() * 50);
+    b.fillStyle = `rgb(${shade + 40},${shade * .42},${shade * .3})`;
+    b.fillRect(i * 28 + (r % 2 ? 14 : 0) + 1, r * 11 - 2 + 1, 26, 9);
+  }
+}
+
+const monster = document.createElement('canvas');
+monster.width = monster.height = 128;
+{
+  const m = monster.getContext('2d');
+  const shape = (pts, fill) => { m.beginPath(); pts.forEach(([x, y], i) => i ? m.lineTo(x, y) : m.moveTo(x, y)); m.closePath(); m.fillStyle = fill; m.fill(); };
+  shape([[20, 128], [14, 74], [30, 40], [46, 26], [82, 26], [98, 40], [114, 74], [108, 128], [84, 128], [78, 96], [50, 96], [44, 128]], '#120a16');
+  shape([[30, 42], [12, 10], [44, 28]], '#120a16');
+  shape([[98, 42], [116, 10], [84, 28]], '#120a16');
+  shape([[14, 74], [2, 112], [8, 106], [10, 120], [16, 108], [24, 118], [24, 86]], '#120a16');
+  shape([[114, 74], [126, 112], [120, 106], [118, 120], [112, 108], [104, 118], [104, 86]], '#120a16');
+  m.fillStyle = '#3c0a10'; m.beginPath(); m.ellipse(64, 66, 26, 19, 0, 0, 7); m.fill();
+  m.fillStyle = '#e6e0cc';
+  for (let i = 0; i < 7; i++) {
+    shape([[40 + i * 7, 52 + Math.abs(i - 3)], [47 + i * 7, 52 + Math.abs(i - 3)], [43.5 + i * 7, 64]], '#e6e0cc');
+    shape([[42 + i * 6, 82 - Math.abs(i - 3)], [48 + i * 6, 82 - Math.abs(i - 3)], [45 + i * 6, 71]], '#e6e0cc');
+  }
+  for (const x of [46, 82]) {
+    m.fillStyle = '#ff2a12'; m.beginPath(); m.ellipse(x, 40, 8, 5, 0, 0, 7); m.fill();
+    m.fillStyle = '#ffe9a0'; m.beginPath(); m.ellipse(x, 40, 3, 2.4, 0, 0, 7); m.fill();
+  }
+}
+
+let silentCard = 0, twinsAt = 0, tapeFlash = 0, ringBurst = 0, followShift = 0, giantOpen = 0, nunStare = 0;
 const SILENT_CARDS = ['The shadow climbs.', 'Nobody is on the stairs.', 'Do not look up, dear.'];
 const noiseTile = document.createElement('canvas');
 noiseTile.width = noiseTile.height = 256;
@@ -1006,44 +1118,88 @@ const scenes = [
     if (a > .975) { c.fillStyle = `rgba(0,0,0,${clamp((a - .975) / .02)})`; c.fillRect(0, 0, W, H); }
   } },
 
-  { name: 'THE GRIN', draw(t) {
-    const age = (t - sceneAt) % 32, a = age / 32, jolt = clamp((grinJolt - t) / .8);
-    c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
-    const reveal = clamp((age - 2) / 12), spread = clamp((age - 8) / 16);
-    const s = H * (.46 + a * .22 + (age > 29 ? (age - 29) * .34 : 0) + jolt * .22);
-    c.save();
-    c.translate(W / 2 + Math.sin(t * .3) * 8 * U, H * .5);
-    c.rotate(Math.sin(t * .17) * .05 + spread * .05);
-    c.scale(s, s);
-    c.globalAlpha = reveal;
-    oval(-.04, -.1, .82, 1.05, '#050505');
-    oval(0, 0, .62, .84, '#b5aea2');
-    oval(0, -.42, .66, .5, '#050505');
-    oval(0, -.2, .56, .42, '#b5aea2');
-    for (const d of [-1, 1]) {
-      oval(d * .26, -.14, .16, .13, '#3a3330');
-      oval(d * .26, -.14, .115, .09, '#e6e2d8');
-      const dx = clamp(mouse.x - .5, -.5, .5) * .1, dy = clamp(mouse.y - .5, -.5, .5) * .07;
-      disc(d * .26 + dx, -.14 + dy, .026, '#000');
+  { name: 'THE HARVEST GIANT', draw(t) {
+    const sky = c.createLinearGradient(0, 0, 0, H * .75);
+    sky.addColorStop(0, '#2a2a3c'); sky.addColorStop(.55, '#8a5a3c'); sky.addColorStop(1, '#e3a95c');
+    c.fillStyle = sky; c.fillRect(0, 0, W, H);
+    const horizon = H * .62, cx = W / 2;
+    c.fillStyle = '#5a3a24';
+    c.beginPath(); c.moveTo(0, H); c.lineTo(0, horizon);
+    c.quadraticCurveTo(W * .25, horizon - 60 * U, W * .5, horizon - 10 * U); c.quadraticCurveTo(W * .78, horizon + 34 * U, W, horizon - 40 * U);
+    c.lineTo(W, H); c.closePath(); c.fill();
+    poly([[W * .08, horizon + 4 * U], [W * .08, horizon - 92 * U], [W * .135, horizon - 150 * U], [W * .19, horizon - 92 * U], [W * .19, horizon + 4 * U]], '#2c1c14');
+    c.fillStyle = '#f0b860'; c.fillRect(W * .118, horizon - 60 * U, W * .034, 64 * U);
+    for (let i = 0; i < 26; i++) {
+      c.fillStyle = '#3a2418';
+      const x = i / 25 * W;
+      c.fillRect(x, horizon + 58 * U + Math.sin(i) * 5 * U, 7 * U, 34 * U);
     }
-    poly([[-.03, -.02], [.03, -.02], [.06, .14], [-.06, .14]], '#8c857a');
-    const mw = .2 + spread * .38, my = .3 - spread * .06, low = .07 + spread * .24, lift = spread * .14;
-    const mouth = () => { c.beginPath(); c.moveTo(-mw, my - lift); c.quadraticCurveTo(0, my + low * .55, mw, my - lift); c.quadraticCurveTo(0, my + low * 2, -mw, my - lift); c.closePath(); };
-    mouth(); c.fillStyle = '#ded9cc'; c.fill();
-    c.save(); mouth(); c.clip();
-    c.strokeStyle = '#4b423c'; c.lineWidth = .009;
-    for (let x = -mw; x < mw; x += .052) { c.beginPath(); c.moveTo(x, my - lift); c.lineTo(x, my + low * 2); c.stroke(); }
-    c.beginPath(); c.moveTo(-mw, my - lift * .2); c.quadraticCurveTo(0, my + low * 1.05, mw, my - lift * .2); c.stroke();
+    c.fillStyle = '#3a2418'; c.fillRect(0, horizon + 66 * U, W, 5 * U);
+    c.fillStyle = '#6e4628'; c.fillRect(0, horizon + 86 * U, W, H);
+    for (let side = 0; side < 2; side++) {
+      c.strokeStyle = '#1e1410'; c.lineWidth = 2 * U; c.beginPath();
+      const x0 = side ? cx : 0, x1 = side ? W : cx;
+      c.moveTo(x0, H * .1); c.quadraticCurveTo((x0 + x1) / 2, H * .22, x1, H * .1); c.stroke();
+      for (let i = 1; i < 6; i++) {
+        const q = i / 6, x = x0 + (x1 - x0) * q, y = H * .1 + Math.sin(q * Math.PI) * H * .06;
+        disc(x, y + 8 * U, 7 * U, '#ffc66b');
+        halo(x, y + 8 * U, 34 * U, 'rgba(255,190,90,.7)', .55 + Math.sin(t * 3 + i * 2) * .15);
+      }
+    }
+    const ground = H * .9, sway = Math.sin(t * .45) * .012, ringR = 340 * U, n = 14;
+    const walker = (i, front) => {
+      const a = i / n * Math.PI * 2 + t * .22, depth = Math.sin(a);
+      if ((depth > 0) !== front) return;
+      const x = cx + Math.cos(a) * ringR, y = ground - 34 * U + depth * 34 * U, s = (42 + depth * 12) * U, hop = Math.abs(Math.sin(t * 2.6 + i)) * 8 * U;
+      c.fillStyle = 'rgba(30,18,12,.3)'; oval(x, y + 2 * U, s * .5, s * .12, 'rgba(30,18,12,.3)');
+      poly([[x - s * .34, y - hop], [x + s * .34, y - hop], [x + s * .12, y - s * .9 - hop], [x - s * .12, y - s * .9 - hop]], i % 3 ? '#b99a5e' : '#8c6f42');
+      c.strokeStyle = '#8c6f42'; c.lineWidth = s * .09; c.lineCap = 'round';
+      for (const d of [-1, 1]) { c.beginPath(); c.moveTo(x + d * s * .12, y - s * .72 - hop); c.lineTo(x + d * s * .42, y - s * (.8 + Math.sin(t * 2.6 + i) * d * .22) - hop); c.stroke(); }
+      c.lineCap = 'butt';
+      for (const [ox, col] of [[-.2, '#b85a18'], [.2, '#b85a18'], [0, '#e0781e']]) oval(x + ox * s, y - s * 1.14 - hop, s * .32, s * .3, col);
+      poly([[x - s * .04, y - s * 1.42 - hop], [x + s * .05, y - s * 1.42 - hop], [x + s * .08, y - s * 1.58 - hop]], '#4a6a2c');
+      for (const d of [-1, 1]) disc(x + d * s * .11, y - s * 1.16 - hop, s * .035, '#1a100a');
+    };
+    for (let i = 0; i < n; i++) walker(i, false);
+    const S = H / 720 * .86;
+    c.save(); c.translate(cx, ground - 30 * U); c.rotate(sway); c.scale(S, S);
+    poly([[-210, 0], [-150, -250], [-96, -290], [96, -290], [150, -250], [210, 0]], '#3a281c');
+    poly([[-100, 0], [-60, -280], [60, -280], [100, 0]], '#4c3524');
+    for (let i = -3; i <= 3; i++) poly([[i * 24 - 12, -280], [i * 24 + 12, -280], [i * 26, -250]], '#7a2e18');
+    for (const [x, y, w, h, col] of [[-146, -160, 46, 40, '#6e4a2a'], [108, -90, 40, 46, '#57402a'], [-60, -60, 34, 34, '#7a5a34']]) {
+      c.fillStyle = col; c.fillRect(x, y, w, h);
+      c.strokeStyle = '#201410'; c.lineWidth = 2; c.setLineDash([5, 5]); c.strokeRect(x, y, w, h); c.setLineDash([]);
+    }
+    const open = clamp((giantOpen - t) / 1 > 1 ? 1 : (giantOpen - t) / 1);
+    [[-1, -.66, '#a84c14'], [1, .66, '#a84c14'], [-1, -.38, '#cc6416'], [1, .38, '#cc6416'], [0, 0, '#e27c1c']].forEach(([, ox, col]) => {
+      oval(ox * 150, -420, 90, 140, col);
+    });
+    c.fillStyle = '#26160e';
+    disc(-58, -440, 8, '#26160e'); disc(58, -440, 8, '#26160e');
+    c.strokeStyle = '#26160e'; c.lineWidth = 4; c.beginPath(); c.moveTo(-60, -376); c.quadraticCurveTo(0, -352, 60, -376); c.stroke();
+    if (open > 0) {
+      oval(0, -552, 88, 16, '#3a1c0c');
+      const py = -552 - open * 22;
+      disc(0, py, 26, '#0c0810');
+      poly([[-22, py - 12], [-20, py - 40], [-4, py - 22]], '#0c0810');
+      poly([[22, py - 12], [20, py - 40], [4, py - 22]], '#0c0810');
+      disc(-9, py - 2, 4.5, '#ffd24a'); disc(9, py - 2, 4.5, '#ffd24a');
+    }
+    c.save(); c.translate(0, -552 - open * 118); c.rotate(open * -.5); c.translate(open * 70, 0);
+    oval(0, 0, 118, 30, '#c9681a');
+    poly([[-12, -24], [14, -24], [26, -78], [8, -72]], '#4a6a2c');
     c.restore();
-    mouth(); c.strokeStyle = '#2a2320'; c.lineWidth = .014; c.stroke();
     c.restore();
-    const dark = c.createRadialGradient(W / 2, H * .5, s * .36, W / 2, H * .5, s * 1.04);
-    dark.addColorStop(0, 'transparent'); dark.addColorStop(1, '#000');
-    c.fillStyle = dark; c.fillRect(0, 0, W, H);
-    const flick = Math.sin(t * 2.3) * Math.sin(t * 7.1) * Math.sin(t * .9);
-    c.fillStyle = `rgba(0,0,0,${flick > .3 ? .72 : .12})`; c.fillRect(0, 0, W, H);
-    grain(.1, 2);
-    if (age > 30.2) { c.fillStyle = '#000'; c.fillRect(0, 0, W, H); }
+    for (let i = 0; i < n; i++) walker(i, true);
+    for (let i = 0; i < 26; i++) {
+      const fall = (t * (.05 + (i % 5) * .012) + i * .137) % 1.1;
+      const x = (i * .39 % 1) * W + Math.sin(t * .7 + i) * 40 * U, y = fall * H, col = ['#d9782a', '#b34a1c', '#e0a640'][i % 3];
+      c.save(); c.translate(x, y); c.rotate(t + i);
+      poly([[-8 * U, 0], [0, -5 * U], [8 * U, 0], [0, 5 * U]], col);
+      c.restore();
+    }
+    c.fillStyle = 'rgba(120,70,20,.1)'; c.fillRect(0, 0, W, H);
+    grain(.05, 2);
   } },
 
   { name: 'THE WHITE CITY', draw(t) {
@@ -1099,6 +1255,80 @@ const scenes = [
       }
     });
     c.fillStyle = `rgba(255,250,235,${clamp(wave * .5 - .32)})`; c.fillRect(0, 0, W, H);
+  } },
+
+  { name: 'THE MAZE', draw(t, dt) {
+    if (!mz.grid) startMaze();
+    const lunge = t - mz.caught, caught = lunge < 1.6;
+    if (!caught) {
+      mz.pi += 2.1 * dt;
+      mz.mi += (t < mz.grace ? 1.2 : 2.55) * dt;
+      while (mz.route.length < mz.pi + 24) extendRoute();
+    } else if (lunge > 1.5) {
+      mz.mi = Math.max(0, mz.pi - BEHIND);
+      mz.grace = t + 5; mz.caught = -99;
+    }
+    const [px, py] = mazePoint(mz.pi), [hx, hy] = mazePoint(mz.pi + .6), [mx, my] = mazePoint(mz.mi);
+    const gap = Math.hypot(mx - px, my - py), sees = mazeSees(px, py, mx, my);
+    if (!caught && gap < .8 && t > mz.grace) { mz.caught = t; mz.lookUntil = t + 1.6; }
+    if (t > mz.nextLook && sees && gap < 7) { mz.lookUntil = t + 2.2; mz.nextLook = t + rnd(9, 15); }
+    mz.look += ((t < mz.lookUntil ? 1 : 0) - mz.look) * clamp(.09 * dt * 60);
+    const want = Math.atan2(hy - py, hx - px) + (mz.look > .5 && mz.lookUntil > t ? Math.PI : 0);
+    let turn = (want - mz.yaw) % (Math.PI * 2);
+    if (turn > Math.PI) turn -= Math.PI * 2;
+    if (turn < -Math.PI) turn += Math.PI * 2;
+    mz.yaw += turn * clamp(.1 * dt * 60);
+    const sway = Math.sin(t * 7.4) * 4 * U, dirX = Math.cos(mz.yaw), dirY = Math.sin(mz.yaw);
+    const planeX = -dirY * MAZE_PLANE, planeY = dirX * MAZE_PLANE, scale = W / (2 * MAZE_PLANE), mid = H / 2 + sway, cw = W / RAYS;
+
+    const ceil = c.createLinearGradient(0, 0, 0, mid);
+    ceil.addColorStop(0, '#4e4a44'); ceil.addColorStop(1, '#0a0908');
+    c.fillStyle = ceil; c.fillRect(0, 0, W, mid);
+    const floor = c.createLinearGradient(0, mid, 0, H);
+    floor.addColorStop(0, '#080605'); floor.addColorStop(1, '#3f2e20');
+    c.fillStyle = floor; c.fillRect(0, mid, W, H - mid);
+
+    c.imageSmoothingEnabled = false;
+    for (let i = 0; i < RAYS; i++) {
+      const cam = i / RAYS * 2 - 1, rx = dirX + planeX * cam, ry = dirY + planeY * cam;
+      let x = Math.floor(px), y = Math.floor(py), side = 0;
+      const stepX = rx < 0 ? -1 : 1, stepY = ry < 0 ? -1 : 1, dx = Math.abs(1 / rx), dy = Math.abs(1 / ry);
+      let sx = (rx < 0 ? px - x : x + 1 - px) * dx, sy = (ry < 0 ? py - y : y + 1 - py) * dy;
+      while (!mz.grid[y][x]) {
+        if (sx < sy) { sx += dx; x += stepX; side = 0; } else { sy += dy; y += stepY; side = 1; }
+      }
+      const z = Math.max(.05, side ? sy - dy : sx - dx), h = scale / z;
+      const hit = side ? px + z * rx : py + z * ry, tex = Math.floor((hit - Math.floor(hit)) * 64);
+      mz.zbuf[i] = z;
+      c.drawImage(brick, tex, 0, 1, 64, i * cw, mid - h / 2, cw + 1, h);
+      c.fillStyle = `rgba(0,0,0,${Math.min(.95, z / 6.5 + (side ? .2 : 0))})`;
+      c.fillRect(i * cw, mid - h / 2, cw + 1, h);
+    }
+
+    const rx = mx - px, ry = my - py, depth = rx * dirX + ry * dirY, across = -rx * dirY + ry * dirX;
+    const near = caught ? clamp(lunge / .35) : 0;
+    if (depth > .15 || near) {
+      const z = near ? 1.1 - near * .5 : depth, size = scale / z * .95;
+      const sx = near ? W / 2 : W / 2 * (1 + across / depth / MAZE_PLANE), top = mid - size * .5 + Math.abs(Math.sin(t * 6)) * -size * .03;
+      const left = sx - size / 2, from = Math.max(0, Math.floor(left / cw)), to = Math.min(RAYS - 1, Math.ceil((left + size) / cw));
+      for (let i = from; i <= to; i++) {
+        if (!near && mz.zbuf[i] < z) continue;
+        c.drawImage(monster, clamp((i * cw - left) / size, 0, .999) * 128, 0, 1, 128, i * cw, top, cw + 1, size);
+      }
+    }
+    c.imageSmoothingEnabled = true;
+
+    const danger = clamp((6 - gap) / 6);
+    if (danger) {
+      const red = c.createRadialGradient(W / 2, H / 2, H * .25, W / 2, H / 2, Math.hypot(W, H) * .55);
+      red.addColorStop(0, 'transparent');
+      red.addColorStop(1, `rgba(150,0,0,${danger * (.3 + Math.abs(Math.sin(t * (3 + danger * 3))) * .3)})`);
+      c.fillStyle = red; c.fillRect(0, 0, W, H);
+    }
+    if (caught) {
+      c.fillStyle = `rgba(0,0,0,${clamp((lunge - .9) / .5)})`; c.fillRect(0, 0, W, H);
+      if (lunge > 1 && card !== 'IT CAUGHT YOU') say('IT CAUGHT YOU');
+    }
   } },
 ];
 
@@ -1351,19 +1581,9 @@ function spriteLlama(t) {
   poly([[.52, -1.26], [1.12, -1.26], [.84, -1.34], [.72, -1.78]], '#17101f');
 }
 
-function spriteUfo(t) {
-  c.globalAlpha = .1 + Math.sin(t * 6) * .03;
-  poly([[-.5, .1], [.5, .1], [1.5, 4], [-1.5, 4]], '#9dffb0');
-  c.globalAlpha = 1;
-  oval(0, -.2, .45, .4, '#7f9aa8');
-  oval(0, 0, 1.1, .28, '#44505c');
-  for (let i = -2; i <= 2; i++) disc(i * .42, .06, .06, Math.floor(t * 4 + i) % 2 ? '#ffd24a' : '#7dff5a');
-}
-
 const ambient = {
   witch() { cross(spriteWitch, { y: .26, speed: .09, size: 42 }); found('witch', 'something just crossed the moon'); },
   cat() { cross(spriteCat, { y: .92, speed: .05, size: 32 }); found('cat', 'a black cat crossed your path'); },
-  ufo() { cross(spriteUfo, { y: .14, speed: .13, size: 36 }); found('ufo', 'they came for the bass'); },
   wink() { if (sceneIx === 0) { moonFace = clock + 5; found('wink', 'the moon saw that'); } },
   eyes() {
     const x = rnd(.06, .94), y = Math.random() < .5 ? rnd(.08, .2) : rnd(.75, .92), s = rnd(7, 12) * U;
@@ -1543,11 +1763,15 @@ function stageClick(e) {
     followShift += 5;
     found('follow', 'that only made it closer');
   } else if (sceneIx === 14) {
-    grinJolt = clock + .8;
-    found('grin', 'it noticed you');
+    giantOpen = clock + 7;
+    found('giant', 'so who is really in charge here');
   } else if (sceneIx === 15) {
     nunStare = clock + 5;
     found('convent', 'the whole convent is looking at you');
+  } else if (sceneIx === 16) {
+    mz.lookUntil = clock + 2.4;
+    mz.nextLook = clock + 12;
+    found('maze', 'you should not have looked back');
   }
 }
 
@@ -1559,7 +1783,7 @@ function runEggs(t, dt) {
     for (let x = 0; x < W; x += 80 * U) c.fillRect(x, 0, 40 * U, H);
   }
   if (t > nextAmbient) {
-    const pool = ['witch', 'cat', 'eyes', 'wink', 'witch', 'cat', 'eyes', 'ufo'];
+    const pool = ['witch', 'cat', 'eyes', 'wink'];
     ambient[pool[Math.floor(rnd(0, pool.length))]]();
     nextAmbient = t + rnd(45, 100);
   }
@@ -1752,7 +1976,7 @@ addEventListener('keydown', e => {
   else if (k === 'w') nextClassic();
   else if (k === 'x') toggleShuffle('classic');
   else if (k === 's') toggleShuffle('spooky');
-  else if (e.shiftKey && /^Digit[1-7]$/.test(e.code)) pickScene(8 + +e.code.slice(5));
+  else if (e.shiftKey && /^Digit[1-8]$/.test(e.code)) pickScene(8 + +e.code.slice(5));
   else if (k >= '1' && k <= '9') pickScene(+k - 1);
 });
 
@@ -1805,7 +2029,7 @@ document.head.append(api);
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
 console.log('%c  .-.\n (o o) boo!\n | O |\n |   |\n \'~~~\'  try typing a word or two', 'color:#ff7a18;font:14px monospace');
-window.ghoulamp = { audio: A, yt, setScene, eggs, ambient, songEgg, shuffleStep };
+window.ghoulamp = { audio: A, yt, setScene, eggs, ambient, songEgg, shuffleStep, mz };
 </script>
 </body>
 </html>
