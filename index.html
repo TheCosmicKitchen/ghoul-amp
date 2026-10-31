@@ -1069,12 +1069,11 @@ function setClassic(on) {
 
 // Plain old-school swirl: colour rings fed back into themselves.
 function drawClassic(t) {
-  feedback({ zoom: 1.022 + A.bass * .02, spin: .007 + Math.sin(t * .13) * .012, keep: .965 });
-  c.globalCompositeOperation = 'lighter';
+  feedback({ zoom: 1.022 + A.bass * .02, spin: .007 + Math.sin(t * .13) * .012, keep: .925 });
   c.lineWidth = 3 * U;
   for (let arm = 0; arm < 4; arm++) {
     const R = (70 + arm * 34 + A.bass * 70) * U, dir = arm % 2 ? -1 : 1, lobes = 3 + arm;
-    c.strokeStyle = `hsl(${t * 35 + arm * 55} 100% 58%)`;
+    c.strokeStyle = `hsl(${t * 35 + arm * 28} 100% 55%)`;
     c.beginPath();
     for (let i = 0; i <= 180; i++) {
       const a = i / 180 * Math.PI * 2, w = (A.wave[(i % 180) * 6] - 128) / 128;
@@ -1084,8 +1083,7 @@ function drawClassic(t) {
     }
     c.closePath(); c.stroke();
   }
-  c.globalCompositeOperation = 'source-over';
-  halo(W / 2, H / 2, (120 + A.bass * 170) * U, `hsl(${t * 35 + 180} 100% 55%)`, .25 + A.pulse * .4);
+  halo(W / 2, H / 2, (90 + A.bass * 130) * U, `hsl(${t * 35 + 180} 100% 50%)`, .12 + A.pulse * .25);
 }
 
 function setScene(i, t) {
