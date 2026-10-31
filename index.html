@@ -2580,7 +2580,7 @@ function qFight(boss) {
   q.battle = { foes, queue: [], boss, pops: [], fire: 0 };
   q.state = 'battle'; q.wait = 1.1; q.swirl = 1; q.sparks.length = 0;
   if (boss) { q.shake = 1; qBanner(`BOSS: ${foes[0].name}`); }
-  qSay(boss ? `${foes[0].name} blocks the stairs!` : `${foes.length > 1 ? 'Monsters' : `A ${foes[0].name}`} appeared!`);
+  qSay(boss ? `${foes[0].name} blocks the stairs!` : `${foes.length > 1 ? 'Monsters' : `${/^[AEIOU]/.test(foes[0].name) ? 'An' : 'A'} ${foes[0].name}`} appeared!`);
 }
 
 function qPop(x, y, text, col) { q.battle.pops.push({ x, y, text, col, life: 1 }); }
