@@ -544,31 +544,51 @@ const CHAT_DEAD = ['F', 'F', 'FFFFFF', 'RIP', 'bro got got', 'restart the run', 
 const ALERTS = ['just followed!', 'subscribed for 13 months!', 'gifted 6 subs!', 'raided with 66 ghouls!'];
 const chat = { lines: [], next: 0, alert: '', alertAt: -99, nextAlert: 12 };
 
-function drawStreamHud(t, danger, caught) {
+const chatFont = size => `${size * U}px VT323, monospace`;
+
+function chatTick(t, pool, pace) {
   if (t > chat.next) {
-    const pool = caught ? CHAT_DEAD : danger > .35 ? CHAT_PANIC : CHAT_CALM;
     const [who, col] = CHATTERS[Math.floor(rnd(0, CHATTERS.length))];
     chat.lines.push({ who, col, text: pool[Math.floor(rnd(0, pool.length))] });
     if (chat.lines.length > 12) chat.lines.shift();
-    chat.next = t + rnd(.7, 2) * (caught ? .2 : 1 - danger * .7);
+    chat.next = t + rnd(.7, 2) * pace;
   }
   if (t > chat.nextAlert) {
     chat.alert = `${CHATTERS[Math.floor(rnd(0, CHATTERS.length))][0]} ${ALERTS[Math.floor(rnd(0, ALERTS.length))]}`;
     chat.alertAt = t; chat.nextAlert = t + rnd(16, 28);
   }
-  const f = size => `${size * U}px VT323, monospace`, pad = 10 * U, pw = 300 * U, ph = H * .62, px = W - pw - 14 * U, py = H * .1;
+}
+
+function drawChatPanel(share) {
+  const pad = 10 * U, pw = 300 * U, ph = H * share, px = W - pw - 14 * U, py = H * .1;
   c.fillStyle = 'rgba(12,6,22,.78)'; c.fillRect(px, py, pw, ph);
   c.fillStyle = '#e23bff'; c.fillRect(px, py, pw, 3 * U);
-  c.textAlign = 'left'; c.font = f(22); c.fillStyle = '#efeaff';
+  c.textAlign = 'left'; c.font = chatFont(22); c.fillStyle = '#efeaff';
   c.fillText('LIVE CHAT', px + pad, py + 26 * U);
-  c.font = f(19);
+  c.font = chatFont(19);
   let y = py + ph - pad;
-  for (let i = chat.lines.length - 1; i >= 0 && y > py + 50 * U; i--) {
+  for (let i = chat.lines.length - 1; i >= 0 && y > py + 68 * U; i--) {
     const { who, col, text } = chat.lines[i];
     c.fillStyle = '#efeaff'; c.fillText(text, px + pad, y);
     c.fillStyle = col; c.fillText(who, px + pad, y - 19 * U);
     y -= 46 * U;
   }
+}
+
+function drawChatAlert(t) {
+  const age = t - chat.alertAt;
+  if (age >= 5) return;
+  c.globalAlpha = clamp(Math.min(age * 3, (5 - age) * 2));
+  c.textAlign = 'center';
+  c.fillStyle = 'rgba(226,59,255,.9)'; c.fillRect(W * .5 - 240 * U, H * .05, 480 * U, 42 * U);
+  c.fillStyle = '#fff'; c.font = chatFont(26); c.fillText(chat.alert, W * .5, H * .05 + 29 * U);
+  c.globalAlpha = 1;
+}
+
+function drawStreamHud(t, danger, caught) {
+  chatTick(t, caught ? CHAT_DEAD : danger > .35 ? CHAT_PANIC : CHAT_CALM, caught ? .2 : 1 - danger * .7);
+  const f = chatFont;
+  drawChatPanel(.62);
   c.fillStyle = 'rgba(12,6,22,.78)'; c.fillRect(14 * U, H * .07, 430 * U, 62 * U);
   c.fillStyle = '#e3122a'; c.fillRect(22 * U, H * .07 + 9 * U, 62 * U, 24 * U);
   c.fillStyle = '#fff'; c.font = f(22); c.fillText('LIVE', 34 * U, H * .07 + 28 * U);
@@ -585,14 +605,7 @@ function drawStreamHud(t, danger, caught) {
   };
   bar(W * .36, 'SANITY', 1 - danger * .9, danger > .6 ? '#ff2a2a' : '#5af0ff');
   bar(W * .36 + 212 * U, 'FLASHLIGHT', 1 - (t * .012 % 1) * .85, '#ffd24a');
-  const age = t - chat.alertAt;
-  if (age < 5) {
-    c.globalAlpha = clamp(Math.min(age * 3, (5 - age) * 2));
-    c.textAlign = 'center';
-    c.fillStyle = 'rgba(226,59,255,.9)'; c.fillRect(W * .5 - 240 * U, H * .05, 480 * U, 42 * U);
-    c.fillStyle = '#fff'; c.font = f(26); c.fillText(chat.alert, W * .5, H * .05 + 29 * U);
-    c.globalAlpha = 1;
-  }
+  drawChatAlert(t);
 }
 
 function buildMaze() {
@@ -1995,12 +2008,387 @@ function drawStarry(t) {
   disc(W * .22, H * .86, 3 * U, '#ffd28a');
 }
 
+/* QUEST: a self-playing 8-bit dungeon crawl. Original sprites in an old JRPG style. */
+const QW = 320, QH = 180, QMAP = 44, QTILE = 16;
+const qLow = document.createElement('canvas');
+qLow.width = QW; qLow.height = QH;
+const qc = qLow.getContext('2d');
+qc.imageSmoothingEnabled = false;
+const qCache = new Map();
+
+const Q_HERO = ['....1111....', '...111111...', '...122221...', '...124242...', '...122221...', '....3333....', '..23333332..', '..23333332..', '...333333...', '...333333...', '...44..44...', '...44..44...'];
+const Q_HERO_B = [...Q_HERO.slice(0, 10), '...44.......', '.......44...'];
+const Q_BLOB = ['..............', '..............', '.....1111.....', '...11111111...', '..1111111111..', '..1120112011..', '.111001100111.', '.111111111111.', '.111133331111.', '11111111111111', '11111111111111', '.111111111111.', '..1111111111..', '..............'];
+const Q_BAT = ['..............', '.1..........1.', '.11...11...11.', '.111.1111.111.', '.111112211111.', '11111100111111', '11111111111111', '111.111111.111', '11...1331...11', '1....1111....1', '......11......', '..............', '..............', '..............'];
+const Q_BEAST = ['..1........1..', '..11......11..', '...11111111...', '...12211221...', '...10011001...', '...11111111...', '..1133333311..', '.111311113111.', '11.11111111.11', '11.11111111.11', '1..11111111..1', '...111..111...', '...111..111...', '..1111..1111..'];
+const Q_FOES = [
+  { name: 'SLIME', rows: Q_BLOB, col: '#40b070', hp: 12, atk: 4, xp: 6 },
+  { name: 'BAT', rows: Q_BAT, col: '#8060c0', hp: 10, atk: 5, xp: 7 },
+  { name: 'IMP', rows: Q_BEAST, col: '#c05830', hp: 16, atk: 6, xp: 9 },
+  { name: 'WOLF', rows: Q_BEAST, col: '#8a8a9a', hp: 20, atk: 7, xp: 12 },
+  { name: 'OOZE', rows: Q_BLOB, col: '#b040a0', hp: 26, atk: 7, xp: 14 },
+  { name: 'WRAITH', rows: Q_BAT, col: '#c8d0e8', hp: 24, atk: 9, xp: 18 },
+  { name: 'OGRE', rows: Q_BEAST, col: '#5a9a4a', hp: 44, atk: 10, xp: 26 },
+];
+const Q_BOSSES = [{ name: 'CAVE KING', rows: Q_BEAST, col: '#c8a020' }, { name: 'FROST WYRM', rows: Q_BEAST, col: '#60b8e8' }, { name: 'ASH DRAGON', rows: Q_BEAST, col: '#e04020' }];
+const Q_GEAR = ['RUSTY', 'IRON', 'STEEL', 'SILVER', 'RUNED', 'MITHRIL', 'FLAME', 'DRAGON', 'STAR'];
+const Q_THEMES = [
+  { name: 'EARTH CAVE', floor: '#3a2c20', fleck: '#4a3a2c', hi: '#8a5a34', mid: '#6a4026', lo: '#2a180e' },
+  { name: 'ICE VAULT', floor: '#20304a', fleck: '#2e4264', hi: '#6a9ad0', mid: '#44709e', lo: '#16243c' },
+  { name: 'MAGMA DEEP', floor: '#3a1a1a', fleck: '#4e2622', hi: '#c85a30', mid: '#8a3420', lo: '#2a0e0a' },
+  { name: 'MOSS CRYPT', floor: '#1e3024', fleck: '#2a4232', hi: '#5a9a60', mid: '#386a44', lo: '#122418' },
+];
+const Q_CHAT = {
+  walk: ['open the chest', 'left room looked better', 'this music slaps', 'any% no potions', 'grind more', 'thief is carrying', 'where is the map', 'how deep does this go', 'just vibing here', 'chat what floor is this'],
+  fight: ['MIRA HEAL', 'crit crit crit', 'ZOT nuke it', 'hit it harder', 'worst rng i have seen', 'LETS GO', 'cure pls', 'OOOO', 'arus is built different'],
+  boss: ['BOSS FIGHT', 'here we go', 'hands are shaking', 'dont miss', 'this is the one', 'POG', 'SAVE YOUR POTIONS'],
+  pause: ['LOOT', 'NICE DROP', 'what did we get', 'equip it', 'is that good?', 'sell it', 'mine'],
+  spoils: ['GG', 'EZ', 'clean', 'level up when', 'too easy', 'next floor pls'],
+  wiped: ['F', 'F', 'FFFFFF', 'run it back', 'bro got got', 'unlucky', 'back to the inn'],
+};
+const q = { run: 1, best: 0, state: 'walk', map: null, floor: 0, route: [], at: 0, gold: 0, potions: 2, steps: 0, log: [], party: [], battle: null, opened: 0, wins: 0, fade: 1, wait: 0, x: 0, y: 0, dx: 1, dy: 0, step: 0, flip: false };
+
+function qSprite(key, rows, pal) {
+  const id = `${key}${Object.values(pal).join('')}`;
+  if (qCache.has(id)) return qCache.get(id);
+  const s = document.createElement('canvas');
+  s.width = rows[0].length; s.height = rows.length;
+  const x = s.getContext('2d');
+  rows.forEach((row, ry) => [...row].forEach((ch, rx) => {
+    if (pal[ch]) { x.fillStyle = pal[ch]; x.fillRect(rx, ry, 1, 1); }
+  }));
+  qCache.set(id, s);
+  return s;
+}
+
+function qTile(theme, wall) {
+  const id = `tile${theme.name}${wall}`;
+  if (qCache.has(id)) return qCache.get(id);
+  const s = document.createElement('canvas');
+  s.width = s.height = QTILE;
+  const x = s.getContext('2d');
+  if (wall) {
+    x.fillStyle = theme.lo; x.fillRect(0, 0, 16, 16);
+    for (let r = 0; r < 4; r++) for (let i = -1; i < 2; i++) {
+      x.fillStyle = (r + i) % 2 ? theme.hi : theme.mid;
+      x.fillRect(i * 8 + (r % 2 ? 4 : 0) + 1, r * 4 + 1, 6, 2);
+    }
+  } else {
+    x.fillStyle = theme.floor; x.fillRect(0, 0, 16, 16);
+    x.fillStyle = theme.fleck;
+    for (const [a, b] of [[3, 2], [11, 5], [6, 11], [13, 13], [1, 9]]) x.fillRect(a, b, 2, 1);
+  }
+  qCache.set(id, s);
+  return s;
+}
+
+function qSay(text) {
+  q.log.push(text);
+  if (q.log.length > 3) q.log.shift();
+}
+
+function qNewParty() {
+  const pick = list => list[Math.floor(rnd(0, list.length))];
+  const names = [pick(['ARUS', 'BRAM', 'DUKE', 'ROLF', 'KAI']), pick(['LYRA', 'FINN', 'SHAE', 'RIKO', 'PIP']), pick(['MIRA', 'ELLA', 'NOA', 'SAGE', 'ROSA']), pick(['ZOT', 'VEX', 'MOX', 'ORIN', 'TAZ'])];
+  q.names = names;
+  q.party = [
+    { name: 'ARUS', job: 'FIGHTER', hp: 34, max: 34, mp: 0, maxMp: 0, atk: 8, def: 4, hair: '#c83020', tunic: '#d8a030', gear: 'RUSTY SWORD' },
+    { name: 'LYRA', job: 'THIEF', hp: 26, max: 26, mp: 0, maxMp: 0, atk: 7, def: 3, hair: '#30a040', tunic: '#208050', gear: 'RUSTY KNIFE' },
+    { name: 'MIRA', job: 'W.MAGE', hp: 22, max: 22, mp: 12, maxMp: 12, atk: 3, def: 2, hair: '#f0f0f0', tunic: '#d84060', gear: 'OAK STAFF' },
+    { name: 'ZOT', job: 'B.MAGE', hp: 20, max: 20, mp: 12, maxMp: 12, atk: 3, def: 2, hair: '#f0c020', tunic: '#3848c0', gear: 'OAK ROD' },
+  ].map((h, i) => ({ ...h, name: names[i], lvl: 1, xp: 0, flash: 0, step: 0 }));
+}
+
+function qNewFloor() {
+  q.floor++;
+  const grid = Array.from({ length: QMAP }, () => new Uint8Array(QMAP).fill(1)), rooms = [];
+  for (let i = 0; i < 9; i++) {
+    const w = 4 + Math.floor(rnd(0, 5)), h = 3 + Math.floor(rnd(0, 4));
+    const x = 2 + Math.floor(rnd(0, QMAP - w - 4)), y = 2 + Math.floor(rnd(0, QMAP - h - 4));
+    for (let b = y; b < y + h; b++) for (let a = x; a < x + w; a++) grid[b][a] = 0;
+    const prev = rooms[rooms.length - 1], cx = x + (w >> 1), cy = y + (h >> 1);
+    if (prev) {
+      for (let a = Math.min(prev.cx, cx); a <= Math.max(prev.cx, cx); a++) grid[prev.cy][a] = 0;
+      for (let b = Math.min(prev.cy, cy); b <= Math.max(prev.cy, cy); b++) grid[b][cx] = 0;
+    }
+    rooms.push({ x, y, w, h, cx, cy });
+  }
+  q.map = grid;
+  q.x = rooms[0].cx; q.y = rooms[0].cy;
+  const last = rooms[rooms.length - 1];
+  q.stairs = [last.cx, last.cy];
+  q.chests = rooms.slice(1, -1).filter((_, i) => i % 2 === 0).map(r => ({ x: r.x + Math.floor(rnd(0, r.w)), y: r.y + Math.floor(rnd(0, r.h)), open: false }));
+  q.theme = Q_THEMES[(q.floor - 1) % Q_THEMES.length];
+  q.route = []; q.at = 0; q.step = 0; q.state = 'walk'; q.fade = 1; q.boss = q.floor % 5 === 0;
+  qSay(`${q.theme.name} B${q.floor}F`);
+}
+
+function qPath(tx, ty) {
+  const from = new Map([[q.x + q.y * QMAP, -1]]), queue = [[q.x, q.y]];
+  for (let head = 0; head < queue.length; head++) {
+    const [x, y] = queue[head];
+    if (x === tx && y === ty) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const key = x + dx + (y + dy) * QMAP;
+      if (q.map[y + dy]?.[x + dx] !== 0 || from.has(key)) continue;
+      from.set(key, x + y * QMAP);
+      queue.push([x + dx, y + dy]);
+    }
+  }
+  const path = [];
+  for (let key = tx + ty * QMAP; key !== undefined && key !== -1; key = from.get(key)) path.unshift([key % QMAP, Math.floor(key / QMAP)]);
+  return path.slice(1);
+}
+
+function qPlan() {
+  const left = q.chests.filter(ch => !ch.open);
+  const routes = left.map(ch => qPath(ch.x, ch.y)).filter(p => p.length).sort((a, b) => a.length - b.length);
+  q.route = routes[0] || qPath(...q.stairs);
+  q.at = 0;
+}
+
+function qLoot(chest) {
+  chest.open = true; q.opened++;
+  const roll = Math.random();
+  if (roll < .4) {
+    const coins = Math.floor(rnd(20, 60) * q.floor);
+    q.gold += coins;
+    qSay(`Found ${coins} GIL!`);
+  } else if (roll < .65) {
+    q.potions++;
+    qSay('Found a POTION!');
+  } else {
+    const hero = q.party[Math.floor(rnd(0, 4))], tier = Q_GEAR[Math.min(Q_GEAR.length - 1, Math.floor((q.floor + 1) / 2))];
+    const armor = Math.random() < .4, kind = armor ? 'MAIL' : hero.job === 'FIGHTER' ? 'SWORD' : hero.job === 'THIEF' ? 'KNIFE' : 'STAFF';
+    if (armor) hero.def += 2; else hero.atk += 2;
+    if (!armor) hero.gear = `${tier} ${kind}`;
+    qSay(`${hero.name} found ${tier} ${kind}!`);
+  }
+}
+
+function qFight(boss) {
+  const scale = 1 + q.floor * .3, pool = Q_FOES.slice(0, Math.min(Q_FOES.length, 2 + Math.ceil(q.floor / 2)));
+  const foe = (type, big, x, y) => {
+    const hp = Math.round((type.hp || 90) * scale * (big ? 1.5 : 1));
+    return { ...type, hp, max: hp, atk: Math.round((type.atk || 11) * (1 + q.floor * .14) + q.floor * 1.6), xp: Math.round((type.xp || 90) * scale), big, x, y, flash: 0, dead: false, name: type.name };
+  };
+  const count = boss ? 1 : 1 + Math.floor(rnd(0, 4));
+  const foes = boss
+    ? [foe(Q_BOSSES[(q.floor / 5 - 1) % Q_BOSSES.length], true, 128, 70)]
+    : Array.from({ length: count }, (_, i) => foe(pool[Math.floor(rnd(0, pool.length))], false, 122 + (i % 2) * 38, 52 + (i >> 1) * 42 + (i % 2) * 8));
+  q.battle = { foes, queue: [], boss, pops: [], fire: 0 };
+  q.state = 'battle'; q.wait = .9; q.fade = 1;
+  qSay(boss ? `${foes[0].name} blocks the stairs!` : `${foes.length > 1 ? 'Monsters' : `A ${foes[0].name}`} appeared!`);
+}
+
+function qPop(x, y, text, col) { q.battle.pops.push({ x, y, text, col, life: 1 }); }
+
+function qHeroAct(hero, foes) {
+  const hurt = q.party.filter(h => h.hp > 0).sort((a, b) => a.hp / a.max - b.hp / b.max)[0];
+  hero.step = 1;
+  if (hero.job === 'W.MAGE' && hero.mp >= 2 && hurt.hp < hurt.max * .55) {
+    const heal = 14 + hero.lvl * 3;
+    hurt.hp = Math.min(hurt.max, hurt.hp + heal); hero.mp -= 2;
+    qSay(`${hero.name} casts CURE on ${hurt.name}. +${heal}`);
+    return;
+  }
+  const target = foes[Math.floor(rnd(0, foes.length))];
+  const fire = hero.job === 'B.MAGE' && hero.mp >= 2;
+  let dmg = Math.max(1, Math.round((fire ? 12 + hero.lvl * 4 : hero.atk + hero.lvl * 1.5) * rnd(.85, 1.2)));
+  const crit = hero.job === 'THIEF' && Math.random() < .25;
+  if (crit) dmg *= 2;
+  if (fire) { hero.mp -= 2; q.battle.fire = 1; }
+  target.hp -= dmg; target.flash = 1;
+  qPop(target.x + 14, target.y, String(dmg), crit ? '#ffd24a' : '#fff');
+  qSay(`${hero.name} ${fire ? 'casts FIRE' : crit ? 'lands a critical' : 'attacks'}! ${target.name} -${dmg}`);
+  if (target.hp <= 0) { target.dead = true; qSay(`${target.name} is defeated!`); }
+}
+
+function qFoeAct(foe) {
+  const alive = q.party.filter(h => h.hp > 0), hero = alive[Math.floor(rnd(0, alive.length))];
+  const dmg = Math.max(1, Math.round((foe.atk - hero.def * .5) * rnd(.8, 1.2)));
+  hero.hp = Math.max(0, hero.hp - dmg); hero.flash = 1;
+  qPop(202, 60 + q.party.indexOf(hero) * 22, String(dmg), '#ff9090');
+  qSay(`${foe.name} hits ${hero.name}. -${dmg}`);
+  if (!hero.hp) qSay(`${hero.name} has fallen!`);
+}
+
+function qWin() {
+  const { foes, boss } = q.battle;
+  const xp = foes.reduce((n, f) => n + f.xp, 0), coins = Math.floor(foes.reduce((n, f) => n + f.max, 0) * .8);
+  q.gold += coins; q.wins++;
+  qSay(`Victory! ${xp} EXP, ${coins} GIL`);
+  for (const h of q.party) {
+    if (!h.hp) { h.hp = Math.ceil(h.max / 4); continue; }
+    h.xp += xp;
+    while (h.xp >= h.lvl * h.lvl * 18 + 12) {
+      h.xp -= h.lvl * h.lvl * 18 + 12; h.lvl++;
+      h.max += h.job === 'FIGHTER' ? 9 : 6; h.hp = h.max; h.atk += h.job.includes('MAGE') ? 1 : 2; h.def += 1;
+      if (h.maxMp) { h.maxMp += 3; h.mp = h.maxMp; }
+      qSay(`${h.name} is now level ${h.lvl}!`);
+    }
+  }
+  const low = q.party.slice().sort((a, b) => a.hp / a.max - b.hp / b.max)[0];
+  if (q.potions && low.hp < low.max * .5) { q.potions--; low.hp = Math.min(low.max, low.hp + 40); qSay(`${low.name} drinks a POTION.`); }
+  if (boss) { q.boss = false; q.potions += 2; qSay('The way down is open! +2 POTIONS'); }
+  q.state = 'spoils'; q.wait = 1.6;
+}
+
+function qDescend() {
+  if (q.boss) return qFight(true);
+  for (const h of q.party) { h.hp = Math.min(h.max, h.hp + Math.ceil(h.max / 3)); h.mp = Math.min(h.maxMp, h.mp + 4); }
+  qNewFloor();
+}
+
+function questUpdate(dt) {
+  if (!q.map) { qNewParty(); qNewFloor(); }
+  q.fade = Math.max(0, q.fade - dt * 2.5);
+  if (q.state === 'walk') {
+    if (q.at >= q.route.length) qPlan();
+    if (!q.route.length) {
+      // Already standing on the goal, as after a boss fight on the stairs.
+      q.step = 0;
+      const chest = q.chests.find(ch => !ch.open && ch.x === q.x && ch.y === q.y);
+      if (chest) { qLoot(chest); q.state = 'pause'; q.wait = 1; } else qDescend();
+      return;
+    }
+    const next = q.route[q.at];
+    q.dx = next[0] - q.x; q.dy = next[1] - q.y;
+    q.step += dt * 5.5;
+    if (q.step < 1) return;
+    q.step = 0; q.at++; q.steps++; q.flip = !q.flip;
+    q.x = next[0]; q.y = next[1];
+    if (q.steps % 7 === 0) for (const h of q.party) if (h.hp) h.hp = Math.min(h.max, h.hp + 1);
+    const chest = q.chests.find(ch => !ch.open && ch.x === q.x && ch.y === q.y);
+    if (chest) { qLoot(chest); q.state = 'pause'; q.wait = 1; q.route = []; return; }
+    if (q.x === q.stairs[0] && q.y === q.stairs[1] && !q.chests.some(ch => !ch.open)) return qDescend();
+    if (q.steps > 7 && Math.random() < .07) { q.steps = 1; qFight(false); }
+  } else if (q.state === 'pause') {
+    q.wait -= dt;
+    if (q.wait <= 0) q.state = 'walk';
+  } else if (q.state === 'spoils') {
+    q.wait -= dt;
+    if (q.wait <= 0) { q.battle = null; q.state = 'walk'; q.fade = 1; q.route = []; }
+  } else if (q.state === 'wiped') {
+    q.wait -= dt;
+    if (q.wait <= 0) {
+      // Every wipe starts a brand new run with a brand new party.
+      q.best = Math.max(q.best, q.floor);
+      q.run++; q.gold = 0; q.potions = 2; q.floor = 0; q.battle = null;
+      qNewParty();
+      qSay(`RUN ${q.run} begins. ${q.names[0]}'s party sets out.`);
+      qNewFloor();
+    }
+  } else if (q.state === 'battle') {
+    const b = q.battle;
+    for (const h of q.party) { h.flash = Math.max(0, h.flash - dt * 3); h.step = Math.max(0, h.step - dt * 2); }
+    for (const f of b.foes) f.flash = Math.max(0, f.flash - dt * 3);
+    b.fire = Math.max(0, b.fire - dt * 3);
+    q.wait -= dt;
+    if (q.wait > 0) return;
+    const foes = b.foes.filter(f => !f.dead), heroes = q.party.filter(h => h.hp > 0);
+    if (!foes.length) return qWin();
+    if (!heroes.length) { qSay('The party has fallen...'); q.state = 'wiped'; q.wait = 2.4; return; }
+    if (!b.queue.length) b.queue = [...heroes, ...foes].sort(() => Math.random() - .5);
+    const actor = b.queue.shift();
+    if (actor.job) { if (actor.hp > 0) qHeroAct(actor, foes); } else if (!actor.dead) qFoeAct(actor);
+    q.wait = .85;
+  }
+}
+
+function qDrawHero(hero, x, y, alt) {
+  const pal = { 1: hero.hp ? hero.hair : '#606060', 2: hero.hp ? '#f0c8a0' : '#909090', 3: hero.hp ? hero.tunic : '#505050', 4: '#201810' };
+  qc.drawImage(qSprite(`hero${alt ? 'b' : 'a'}`, alt ? Q_HERO_B : Q_HERO, pal), Math.round(x), Math.round(y));
+}
+
+function qDrawMap() {
+  const px = (q.x + q.dx * q.step) * QTILE, py = (q.y + q.dy * q.step) * QTILE;
+  const camX = Math.round(px - QW / 2 + 8), camY = Math.round(py - QH / 2 + 8), wall = qTile(q.theme, true), floor = qTile(q.theme, false);
+  qc.fillStyle = '#000'; qc.fillRect(0, 0, QW, QH);
+  for (let y = Math.floor(camY / QTILE); y * QTILE < camY + QH; y++) for (let x = Math.floor(camX / QTILE); x * QTILE < camX + QW; x++) {
+    const solid = q.map[y]?.[x] ?? 1;
+    qc.drawImage(solid ? wall : floor, x * QTILE - camX, y * QTILE - camY);
+  }
+  const [sx, sy] = q.stairs;
+  qc.fillStyle = '#000'; qc.fillRect(sx * QTILE - camX + 2, sy * QTILE - camY + 2, 12, 12);
+  qc.fillStyle = q.theme.hi;
+  for (let i = 0; i < 4; i++) qc.fillRect(sx * QTILE - camX + 3 + i, sy * QTILE - camY + 3 + i * 3, 10 - i * 2, 2);
+  for (const ch of q.chests) {
+    const x = ch.x * QTILE - camX, y = ch.y * QTILE - camY;
+    qc.fillStyle = '#6a3a14'; qc.fillRect(x + 2, y + 4, 12, 10);
+    qc.fillStyle = ch.open ? '#120a04' : '#b06a28'; qc.fillRect(x + 3, y + 5, 10, ch.open ? 4 : 3);
+    qc.fillStyle = '#f0c840'; qc.fillRect(x + 7, y + 8, 2, 3);
+  }
+  qDrawHero(q.party[0], QW / 2 - 6, QH / 2 - 4, q.flip);
+}
+
+function qDrawBattle(t) {
+  const b = q.battle, th = q.theme;
+  qc.fillStyle = '#000'; qc.fillRect(0, 0, QW, QH);
+  for (let x = 0; x < QW; x += 16) { qc.drawImage(qTile(th, true), x, 8); qc.drawImage(qTile(th, true), x, 24); }
+  qc.fillStyle = th.floor; qc.fillRect(0, 40, QW, 4);
+  for (const f of b.foes) {
+    if (f.dead) continue;
+    const scale = f.big ? 4 : 2, s = qSprite(`foe${f.name}`, f.rows, { 1: f.col, 2: '#fff', 0: '#101010', 3: '#401010' });
+    if (f.flash > .4 && Math.floor(t * 30) % 2) continue;
+    qc.drawImage(s, f.x, f.y + Math.sin(t * 3 + f.x) * 1.5, s.width * scale, s.height * scale);
+  }
+  q.party.forEach((h, i) => {
+    if (h.flash > .3 && Math.floor(t * 30) % 2) return;
+    qDrawHero(h, 206 - h.step * 14, 56 + i * 22, Math.floor(t * 3) % 2 === 0);
+  });
+  if (b.fire) { qc.fillStyle = `rgba(255,120,30,${b.fire * .45})`; qc.fillRect(0, 44, 190, 136); }
+  for (const p of b.pops) p.life -= .02;
+  b.pops = b.pops.filter(p => p.life > 0);
+}
+
+function drawQuest(t, dt) {
+  questUpdate(dt);
+  if (q.battle) qDrawBattle(t); else qDrawMap();
+  const s = Math.min(W / QW, H / QH), ox = (W - QW * s) / 2, oy = (H - QH * s) / 2;
+  c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(qLow, ox, oy, QW * s, QH * s);
+  c.imageSmoothingEnabled = true;
+  const P = v => v * s;
+  const win = (x, y, w, h) => {
+    c.fillStyle = '#1830a8'; c.fillRect(ox + P(x), oy + P(y), P(w), P(h));
+    c.strokeStyle = '#fff'; c.lineWidth = P(1); c.strokeRect(ox + P(x), oy + P(y), P(w), P(h));
+  };
+  const text = (str, x, y, size = 9, col = '#fff') => {
+    c.fillStyle = col; c.textAlign = 'left'; c.font = `${P(size)}px VT323, monospace`;
+    c.fillText(str, ox + P(x), oy + P(y));
+  };
+  win(4, 4, 112, 48);
+  q.party.forEach((h, i) => {
+    const y = 13 + i * 11;
+    text(h.name, 9, y, 9, h.hp ? '#fff' : '#ff8080');
+    text(`L${h.lvl}`, 36, y, 9, '#c8d8ff');
+    text(`${h.hp}/${h.max}`, 54, y, 9, h.hp < h.max * .3 ? '#ffb040' : '#fff');
+    if (h.maxMp) text(`MP${h.mp}`, 92, y, 8, '#9fd8ff');
+  });
+  win(4, 56, 112, 26);
+  text(`${q.theme.name} B${q.floor}F`, 9, 65);
+  text(`GIL ${q.gold}  POTION ${q.potions}`, 9, 76, 8, '#ffe08a');
+  win(4, 86, 112, 15);
+  text(`RUN ${q.run}   BEST B${Math.max(q.best, q.floor)}F`, 9, 96, 8, '#c8d8ff');
+  win(4, QH - 40, 200, 36);
+  q.log.forEach((line, i) => text(line, 9, QH - 29 + i * 11));
+  if (q.battle) for (const p of q.battle.pops) text(p.text, p.x, p.y - (1 - p.life) * 16, 11, p.col);
+  if (q.fade) { c.fillStyle = `rgba(0,0,0,${q.fade})`; c.fillRect(0, 0, W, H); }
+  const mood = q.state === 'battle' ? (q.battle.boss ? 'boss' : 'fight') : q.state;
+  chatTick(t, Q_CHAT[mood], mood === 'walk' ? 1.3 : .6);
+  drawChatPanel(.54);
+  drawChatAlert(t);
+}
+
 const CLASSICS = [
   ['SWIRL', drawSwirl, 'classics'], ['BARS', drawSpectrum, 'classics'], ['PLASMA', drawPlasma, 'classics'], ['KALEIDO', drawKaleido, 'classics'], ['SCOPE', drawScope, 'classics'],
   ['BATTERY', drawBattery, 'wmp9'], ['ALCHEMY', drawAlchemy, 'wmp9'], ['AMBIENCE', drawAmbience, 'wmp9'], ['FIRE', drawFirestorm, 'wmp9'], ['MIST', drawMist, 'wmp9'],
   ['SPIKES', drawSpikes, 'xp'], ['PLENOPT', drawPlenoptic, 'xp'], ['PARTICLE', drawParticle, 'xp'], ['COLORS', drawColors, 'xp'], ['DOTS', drawDots, 'xp'],
   ['SUNSET', drawSunset, 'chill'], ['AURORA', drawAurora, 'chill'], ['HEARTH', drawHearth, 'chill'], ['RAIN', drawRain, 'chill'],
   ['LAVA', drawLava, 'chill'], ['KOI', drawKoi, 'chill'], ['PEAKS', drawPeaks, 'chill'], ['STARS', drawStarry, 'chill'],
+  ['8-BIT QUEST', drawQuest, 'chill'],
 ];
 
 // Each shuffle plays everything once before repeating.
@@ -2347,7 +2735,9 @@ function frame(ms) {
 setScene(0, 0);
 const startList = new URLSearchParams(location.search).get('list') || parseList(PLAYLIST) || store.get('ghoulamp.list');
 if (startList) { yt.list = startList; $('yt-empty').hidden = true; $('url').value = `https://www.youtube.com/playlist?list=${startList}`; }
-if (new URLSearchParams(location.search).has('chill')) setShuffle('chill');
+const startMode = new URLSearchParams(location.search);
+if (startMode.has('chill')) setShuffle('chill');
+if (startMode.has('quest')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawQuest));
 if (location.protocol === 'file:') note('YouTube needs a web address. Open this from GitHub Pages, not as a file.', true);
 
 const api = document.createElement('script');
@@ -2356,7 +2746,7 @@ api.onerror = () => note('Could not reach YouTube. Check the internet connection
 document.head.append(api);
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
-window.ghoulamp = { audio: A, yt, setScene, shuffleStep, mz };
+window.ghoulamp = { audio: A, yt, setScene, shuffleStep, mz, q, questUpdate };
 </script>
 </body>
 </html>
