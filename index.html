@@ -537,19 +537,50 @@ const MAZE = 21, RAYS = 320, MAZE_PLANE = .66, BEHIND = 9;
 const mz = { grid: null, route: [], pi: 0, mi: 0, yaw: 0, look: 0, lookUntil: 0, nextLook: 12, caught: -99, grace: 0, deaths: 0, zbuf: new Float32Array(RAYS) };
 
 // The maze doubles as a horror game stream, with the video as the streamer's cam.
-const CHATTERS = [['bonez_mcgee', '#ff7a18'], ['pumpkinspice99', '#ffc66b'], ['mothman_irl', '#9fd0ff'], ['grave_digger', '#7dff5a'], ['ectoplasma', '#5af0ff'], ['count_chuckula', '#ff5a7a'], ['batty_boi', '#d58cff'], ['hexed_up', '#e9e0c9']];
-const CHAT_CALM = ['is that a wall or a different wall', 'chat is this maze real', 'wrong way lol', 'nice bricks', 'who hired this monster', 'lurking from the crypt', 'first time here, is it always bricks', 'pog', 'left. no, other left', 'streamer never skips leg day'];
-const CHAT_PANIC = ['BEHIND YOU', 'RUN', 'RUN RUN RUN', 'its right there', 'dont look back', 'bro is cooked', 'HE CANT HEAR US CHAT', 'GO GO GO'];
-const CHAT_DEAD = ['F', 'F', 'FFFFFF', 'RIP', 'bro got got', 'restart the run', 'deathless run over'];
+const CHATTERS = [
+  ['bonez_mcgee', '#ff7a18'], ['pumpkinspice99', '#ffc66b'], ['mothman_irl', '#9fd0ff'], ['grave_digger', '#7dff5a'], ['ectoplasma', '#5af0ff'], ['count_chuckula', '#ff5a7a'],
+  ['batty_boi', '#d58cff'], ['hexed_up', '#e9e0c9'], ['soup_enjoyer', '#ffd24a'], ['nana_plays', '#ff9fd0'], ['dad_of_three', '#a0e08a'], ['xp_farmer', '#8ab4ff'],
+  ['sleepy_otter', '#c8a8ff'], ['tax_season', '#7fe0c0'], ['goblin_mode', '#b8e04a'], ['lurker_4life', '#a8a8c0'], ['coffee_wizard', '#e0a878'], ['frog_lawyer', '#6fd86f'],
+  ['speedrun_steve', '#ff8a5a'], ['mod_gary', '#5ad0ff'], ['tiny_kevin', '#ffb0b0'], ['ok_computer_', '#d0d0ff'], ['the_real_doug', '#f0d060'], ['moss_enjoyer', '#90c890'],
+];
+const CHAT_ANY = [
+  'first', 'lol', 'lmao', 'W', 'L', '+1', 'real', 'facts', 'no shot', 'pog', 'this is so peaceful', 'comfort stream fr', 'hi from brazil', 'hello from norway',
+  'good morning chat', 'it is 3am why am i here', 'just got off work', 'what did i miss', 'back from the store', 'made soup, ask me anything', 'my cat just stepped on my desk',
+  'dog says hi', 'someone clip that', 'mods??', 'is this live', 'is this a rerun', 'what song is this', 'who made this playlist', 'this song goes hard', 'turn it up',
+  'muted, just here for vibes', 'been here since run 1', 'lurking at work dont tell', 'my boss is walking by brb', 'chat should i order pizza', 'order the pizza', 'water check, drink up',
+  'stretch your back chat', 'anyone else on their 3rd coffee', 'what monitor is that', 'can we get some 7s', '7777777', 'wait this slaps', 'im learning so much', 'taking notes',
+  'my kid thinks this is real', 'nana here, hello dear', 'how do i turn off caps', 'sorry wrong chat', 'happy tuesday', 'is it tuesday', 'chat are we good people',
+];
+const CHAT_REPLIES = ['true', 'no way', 'facts', 'source?', 'say it louder', 'heard that before', 'this guy gets it', 'lol exactly', 'absolutely not', 'correct', 'hard disagree', 'go to bed', 'you good?', 'ratio', 'thank you', 'real', 'i respect it'];
+const CHAT_CALM = [
+  'is that a wall or a different wall', 'chat is this maze real', 'wrong way lol', 'nice bricks', 'who hired this monster', 'lurking from the crypt', 'first time here, always bricks?',
+  'left. no, other left', 'streamer never skips leg day', 'love the masonry', 'great grout work', 'death count: {deaths}', 'who built this place', 'we have been here before', 'that brick looks familiar',
+  'is there a map dlc', 'try the other corridor', 'walking simulator goated', 'sanity looks fine to me', 'flashlight still has juice', 'zero jump scares yet', 'it is too quiet', 'something smells off', 'i miss the sun',
+];
+const CHAT_PANIC = ['BEHIND YOU', 'RUN', 'RUN RUN RUN', 'its right there', 'dont look back', 'bro is cooked', 'HE CANT HEAR US CHAT', 'GO GO GO', 'turn around. NO WAIT', 'WHY IS IT FASTER', 'i cant watch', 'hiding behind my couch', 'LEFT LEFT LEFT', 'this is not chill', 'mom come pick me up', 'teeth. so many teeth', 'nope nope nope', 'SPRINT BUTTON WHERE'];
+const CHAT_DEAD = ['F', 'F', 'FFFFFF', 'RIP', 'bro got got', 'restart the run', 'deathless run over', 'death {deaths}, nice', 'well that happened', 'he had a family', 'skill issue', 'i saw that coming', 'press F to doubt', 'thats going in the clip', 'run it back', 'we go again'];
 const ALERTS = ['just followed!', 'subscribed for 13 months!', 'gifted 6 subs!', 'raided with 66 ghouls!'];
 const chat = { lines: [], next: 0, alert: '', alertAt: -99, nextAlert: 12 };
 
 const chatFont = size => `${size * U}px VT323, monospace`;
 
-function chatTick(t, pool, pace) {
+// Mixes on-topic lines, off-topic chatter and replies, and fills in {tokens} from the game.
+function chatLine(pool, vars) {
+  const pick = list => list[Math.floor(rnd(0, list.length))], recent = chat.lines.slice(-10), roll = Math.random();
+  const prev = recent[recent.length - 1];
+  if (prev && roll < .13) return { raw: 'reply', text: `@${prev.who} ${pick(CHAT_REPLIES)}` };
+  const list = roll < .36 ? CHAT_ANY : pool;
+  let raw = pick(list);
+  for (let i = 0; i < 12 && recent.some(l => l.raw === raw); i++) raw = pick(list);
+  return { raw, text: raw.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? key) };
+}
+
+function chatTick(t, pool, pace, vars = {}) {
   if (t > chat.next) {
-    const [who, col] = CHATTERS[Math.floor(rnd(0, CHATTERS.length))];
-    chat.lines.push({ who, col, text: pool[Math.floor(rnd(0, pool.length))] });
+    const speaker = () => CHATTERS[Math.floor(rnd(0, CHATTERS.length))];
+    let [who, col] = speaker();
+    while (who === chat.lines[chat.lines.length - 1]?.who) [who, col] = speaker();
+    chat.lines.push({ who, col, ...chatLine(pool, vars) });
     if (chat.lines.length > 12) chat.lines.shift();
     chat.next = t + rnd(.7, 2) * pace;
   }
@@ -586,7 +617,7 @@ function drawChatAlert(t) {
 }
 
 function drawStreamHud(t, danger, caught) {
-  chatTick(t, caught ? CHAT_DEAD : danger > .35 ? CHAT_PANIC : CHAT_CALM, caught ? .2 : 1 - danger * .7);
+  chatTick(t, caught ? CHAT_DEAD : danger > .35 ? CHAT_PANIC : CHAT_CALM, caught ? .2 : 1 - danger * .7, { deaths: mz.deaths });
   const f = chatFont;
   drawChatPanel(.62);
   c.fillStyle = 'rgba(12,6,22,.78)'; c.fillRect(14 * U, H * .07, 430 * U, 62 * U);
@@ -2039,13 +2070,42 @@ const Q_THEMES = [
   { name: 'MOSS CRYPT', floor: '#1e3024', fleck: '#2a4232', hi: '#5a9a60', mid: '#386a44', lo: '#122418' },
 ];
 const Q_CHAT = {
-  walk: ['open the chest', 'left room looked better', 'this music slaps', 'any% no potions', 'grind more', 'thief is carrying', 'where is the map', 'how deep does this go', 'just vibing here', 'chat what floor is this'],
-  fight: ['MIRA HEAL', 'crit crit crit', 'ZOT nuke it', 'hit it harder', 'worst rng i have seen', 'LETS GO', 'cure pls', 'OOOO', 'arus is built different'],
-  boss: ['BOSS FIGHT', 'here we go', 'hands are shaking', 'dont miss', 'this is the one', 'POG', 'SAVE YOUR POTIONS'],
-  pause: ['LOOT', 'NICE DROP', 'what did we get', 'equip it', 'is that good?', 'sell it', 'mine'],
-  spoils: ['GG', 'EZ', 'clean', 'level up when', 'too easy', 'next floor pls'],
-  wiped: ['F', 'F', 'FFFFFF', 'run it back', 'bro got got', 'unlucky', 'back to the inn'],
+  walk: [
+    'open the chest', 'left room looked better', 'any% no potions', 'grind more', '{thief} is carrying', 'where is the map', 'how deep does this go', 'just vibing here', 'chat what floor is this',
+    'B{floor}F already??', '{hero} walks so funny', 'love this tileset', 'try the east wall', 'pacing is immaculate', 'who keeps leaving chests here', 'who pays for these torches', '{gold} GIL and no inn',
+    'best so far is B{best}F', 'run {run} is the one', 'i believe in run {run}', '{mage} has zero hp why', '{tank} doing all the work', 'can we rest', '{potions} potions left, hoard them', 'no save points lol',
+    'speedrunners hate this route', 'route is suboptimal', 'stairs were right there', 'dont skip the side rooms', 'the walls are so clean', 'imagine paying rent here', 'whats the lore here', 'this dungeon has 2 stars',
+  ],
+  fight: [
+    '{healer} HEAL', 'crit crit crit', '{mage} nuke it', 'hit it harder', 'worst rng i have seen', 'LETS GO', 'cure pls', 'OOOO', '{tank} is built different', 'whiff', 'get the {foe}', 'not the {foe} again',
+    'i hate {foe}s', '{foe} has a family', 'ok {foe} is kinda cute', 'pet the {foe}', 'why is {thief} so fast', 'focus fire chat', 'kill the left one', 'no the right one', '{hero} PLEASE', 'turn based gaming peaked here',
+    'damage numbers go up', 'that had to hurt', 'run away lol', 'use a potion', 'save mp for the boss', '{mage} out of mp soon', 'easy fight', 'this is getting scary', 'we are so back', 'its so over',
+  ],
+  boss: [
+    'BOSS FIGHT', 'here we go', 'hands are shaking', 'dont miss', 'this is the one', 'SAVE YOUR POTIONS', '{foe} is huge', 'how much hp does it have', 'dad just walked in, boss time', '{healer} carry us',
+    '{foe} looks mad', 'we are not ready', 'everyone lock in', 'clip this', 'heart rate check', 'B{floor}F boss, big moment', 'this killed me last time', '{mage} big spell now', 'i cannot look', 'for run {run}!',
+  ],
+  pause: [
+    'LOOT', 'NICE DROP', 'what did we get', 'equip it', 'is that good?', 'sell it', 'mine', 'give it to {tank}', 'give it to {thief}', 'wow a chest', 'chest o clock', 'shiny', 'daddy needs new boots',
+    'i would have left that', 'trash loot', 'thats a mimic trust me', 'ok thats kinda nice', '{gold} GIL, buying a house', 'rng blessed us', 'put it in the bank', 'found it before you did',
+  ],
+  spoils: [
+    'GG', 'EZ', 'clean', 'level up when', 'too easy', 'next floor pls', 'free xp', 'nice one team', '{tank} MVP', '{healer} MVP', '{thief} MVP', 'was that the {foe}', 'we move', 'gold gold gold', 'ez clap',
+    'barely survived tbh', 'they didnt stand a chance', 'i was worried for a sec', 'farm them again', '{gold} GIL lets go', 'not even close',
+  ],
+  wiped: [
+    'F', 'F', 'FFFFFF', 'run it back', 'bro got got', 'unlucky', 'rip {tank}', 'rip {healer}', 'pour one out', 'B{floor}F was a good run', 'best is still B{best}F', 'should have healed', 'told you to use potions',
+    'o7', 'thanks for the memories', 'that was run {run}', 'new party when', 'gone but not forgotten', 'i miss them already', 'who was tanking', 'character development', 'skill issue honestly',
+  ],
 };
+
+function questChatVars() {
+  const alive = q.party.filter(h => h.hp), foes = q.battle?.foes.filter(f => !f.dead) || [];
+  return {
+    hero: (alive[Math.floor(rnd(0, alive.length))] || q.party[0]).name, tank: q.names[0], thief: q.names[1], healer: q.names[2], mage: q.names[3],
+    foe: foes[0]?.name ?? 'monster', floor: q.floor, best: Math.max(q.best, q.floor), run: q.run, gold: q.gold, potions: q.potions,
+  };
+}
 const q = { run: 1, best: 0, state: 'walk', map: null, floor: 0, route: [], at: 0, gold: 0, potions: 2, steps: 0, log: [], party: [], battle: null, opened: 0, wins: 0, fade: 1, wait: 0, x: 0, y: 0, dx: 1, dy: 0, step: 0, flip: false };
 
 function qSprite(key, rows, pal) {
@@ -2377,7 +2437,7 @@ function drawQuest(t, dt) {
   if (q.battle) for (const p of q.battle.pops) text(p.text, p.x, p.y - (1 - p.life) * 16, 11, p.col);
   if (q.fade) { c.fillStyle = `rgba(0,0,0,${q.fade})`; c.fillRect(0, 0, W, H); }
   const mood = q.state === 'battle' ? (q.battle.boss ? 'boss' : 'fight') : q.state;
-  chatTick(t, Q_CHAT[mood], mood === 'walk' ? 1.3 : .6);
+  chatTick(t, Q_CHAT[mood], mood === 'walk' ? 1.3 : .6, questChatVars());
   drawChatPanel(.54);
   drawChatAlert(t);
 }
@@ -2746,7 +2806,7 @@ api.onerror = () => note('Could not reach YouTube. Check the internet connection
 document.head.append(api);
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
-window.ghoulamp = { audio: A, yt, setScene, shuffleStep, mz, q, questUpdate };
+window.ghoulamp = { audio: A, yt, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatPools: { Q_CHAT, CHAT_ANY, CHAT_CALM, CHAT_PANIC, CHAT_DEAD, CHAT_REPLIES, CHATTERS }, questChatVars };
 </script>
 </body>
 </html>
