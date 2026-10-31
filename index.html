@@ -19,7 +19,7 @@
   #scan { position: fixed; inset: 0; pointer-events: none;
     background: repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 1px, transparent 1px 3px); }
   #main.shade > :not(.bar) { display: none; }
-  body.classic #stage { filter: none; }
+  body.classic #stage, body.stark #stage { filter: none; }
   #picker, #classics { gap: 2px; }
   #classics button { flex: 1; min-width: 0; padding: 3px 0; }
   #picker button { flex: 1; min-width: 0; min-height: 24px; padding: 0; font-size: 16px; }
@@ -1098,7 +1098,7 @@ const scenes = [
         c.restore();
       }
     });
-    c.fillStyle = `rgba(255,250,235,${clamp(wave * 1.6 - 1.15)})`; c.fillRect(0, 0, W, H);
+    c.fillStyle = `rgba(255,250,235,${clamp(wave * .5 - .32)})`; c.fillRect(0, 0, W, H);
   } },
 ];
 
@@ -1249,6 +1249,7 @@ function setScene(i, t) {
   sceneIx = (i + scenes.length) % scenes.length;
   sceneAt = t; wipe = 1; ghosts.length = 0; motes.length = 0; fx.length = 0;
   $('sceneName').textContent = sceneIx + 1;
+  document.body.classList.toggle('stark', scenes[sceneIx].name === 'THE WHITE CITY');
   [...$('picker').children].forEach((b, n) => b.classList.toggle('on', n === sceneIx));
 }
 
