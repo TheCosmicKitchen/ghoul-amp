@@ -84,7 +84,7 @@
   #hint { position: fixed; right: 16px; bottom: 12px; color: rgba(233,224,201,.55); font-size: 16px;
     text-shadow: 0 1px 2px #000; pointer-events: none; }
   body.party #hint { opacity: 0; }
-  @media (max-height: 620px) { #list { left: 432px; top: 16px; } }
+  @media (max-height: 800px) { #list { left: 432px; top: 16px; } }
   @media (max-width: 860px) {
     #list { left: 16px; top: 272px; }
     html, body { overflow: auto; }
@@ -138,7 +138,7 @@
   <div class="row" id="classics" role="group" aria-label="Winamp classic visualizers"></div>
 </section>
 
-<div id="hint">H party mode · F fullscreen · N next scene · W classics · X classic shuffle · S spooky shuffle · 1-9 and Shift+1-6 pick a scene</div>
+<div id="hint">H party mode · F fullscreen · N next scene · W classics · X classic shuffle · S spooky shuffle · 1-9 and Shift+1-7 pick a scene</div>
 
 <script>
 // Paste your playlist link or ID here so it loads for everyone without pasting it in.
@@ -369,7 +369,7 @@ function drawBats(t, dt, color) {
 /* ---------- scenes ---------- */
 const DANCERS = 5, headPop = new Array(DANCERS).fill(0);
 let danceStep = 0, dancePhase = 0, houseLit = 0, wispCall = 0;
-let silentCard = 0, twinsAt = 0, tapeFlash = 0, ringBurst = 0, followShift = 0, grinJolt = 0;
+let silentCard = 0, twinsAt = 0, tapeFlash = 0, ringBurst = 0, followShift = 0, grinJolt = 0, nunStare = 0;
 const SILENT_CARDS = ['The shadow climbs.', 'Nobody is on the stairs.', 'Do not look up, dear.'];
 const noiseTile = document.createElement('canvas');
 noiseTile.width = noiseTile.height = 256;
@@ -1045,6 +1045,61 @@ const scenes = [
     grain(.1, 2);
     if (age > 30.2) { c.fillStyle = '#000'; c.fillRect(0, 0, W, H); }
   } },
+
+  { name: 'THE WHITE CITY', draw(t) {
+    const wave = Math.sin(t * .2) * .5 + .5, sky = H * .13, ground = H * .68, cx = W / 2;
+    c.fillStyle = '#d4d4cd'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#ecebe3';
+    c.fillRect(0, sky, W, ground - sky);
+    for (let x = 0; x < W + 90 * U; x += 180 * U) c.fillRect(x, sky - 40 * U, 90 * U, 42 * U);
+    c.fillStyle = '#c6c3b8';
+    const tile = 34 * U;
+    for (let r = 0, y = sky; y < ground; r++, y += tile) {
+      c.fillRect(0, y, W, 1.5 * U);
+      for (let x = r % 2 ? -tile : 0; x < W; x += tile * 2) c.fillRect(x, y, 1.5 * U, tile);
+    }
+    const arch = (x, w, h, fill) => {
+      c.fillStyle = fill; c.beginPath();
+      c.moveTo(x - w, ground); c.lineTo(x - w, ground - h + w); c.arc(x, ground - h + w, w, Math.PI, 0); c.lineTo(x + w, ground);
+      c.closePath(); c.fill();
+    };
+    for (const x of [.14, .86]) arch(x * W, 66 * U, 250 * U, '#0a0a0a');
+    arch(cx, 170 * U, 400 * U, '#120403');
+    c.save();
+    arch(cx, 164 * U, 394 * U, '#120403');
+    c.clip();
+    for (let i = -7; i <= 7; i++) {
+      const fx = cx + i * 24 * U, fh = (120 + wave * 170 + Math.sin(t * 5 + i * 1.9) * 34 + (7 - Math.abs(i)) * 16) * U;
+      c.fillStyle = i % 2 ? '#d93a12' : '#ff9a1e';
+      c.beginPath(); c.moveTo(fx - 34 * U, ground); c.quadraticCurveTo(fx + Math.sin(t * 3 + i) * 12 * U, ground - fh * 1.5, fx + 34 * U, ground); c.fill();
+    }
+    c.fillStyle = '#17110e'; c.fillRect(cx - 5 * U, ground - 250 * U, 10 * U, 250 * U);
+    c.restore();
+    halo(cx, ground - 120 * U, (260 + wave * 120) * U, 'rgba(255,120,30,.7)', .3 + wave * .3);
+    c.fillStyle = '#f5f4ee'; c.fillRect(0, ground, W, H - ground);
+    c.fillStyle = '#d9d7cd';
+    for (let i = -12; i <= 12; i++) {
+      c.beginPath(); c.moveTo(cx + i * 40 * U, ground); c.lineTo(cx + i * 150 * U, H); c.lineTo(cx + i * 150 * U + 3 * U, H); c.lineTo(cx + i * 40 * U + 1 * U, ground); c.fill();
+    }
+    const staring = nunStare > t;
+    [[11, 86, .72], [8, 128, .84], [5, 186, 1]].forEach(([n, size, y], row) => {
+      const s = size * U;
+      for (let i = 0; i < n; i++) {
+        if (n === 5 && i === 2) continue;
+        const x = W * (i + .5) / n, gy = H * y, sway = staring ? 0 : Math.sin(t * 1.15 + row * .9);
+        c.fillStyle = 'rgba(40,36,30,.2)'; oval(x + s * .1, gy, s * .4, s * .07, 'rgba(40,36,30,.2)');
+        c.save(); c.translate(x, gy); c.rotate(sway * .07); c.scale(s, s);
+        poly([[-.36, 0], [.36, 0], [.22, -1.2], [-.22, -1.2]], '#0a0a0a');
+        oval(0, -1.38, .25, .33, '#0a0a0a');
+        oval(0, -1.33, .155, .21, '#efeee6');
+        oval(0, -1.32, .1, .14, '#d9c9b5');
+        poly([[-.16, -1.2], [.16, -1.2], [0, -.92]], '#efeee6');
+        for (const d of [-1, 1]) disc(d * .045, -1.34, staring ? .018 : .01, staring ? '#b01216' : '#222');
+        c.restore();
+      }
+    });
+    c.fillStyle = `rgba(255,250,235,${clamp(wave * 1.6 - 1.15)})`; c.fillRect(0, 0, W, H);
+  } },
 ];
 
 function drawGhosts(t, dt) {
@@ -1104,13 +1159,13 @@ function drawSpectrum() {
   c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
   const n = 32, rows = 28, gap = 3 * U, bw = W * .9 / n, top = H * .08, rh = H * .84 / rows;
   for (let i = 0; i < n; i++) {
-    const v = clamp((A.bars[i * 2] + A.bars[i * 2 + 1]) * 1.15), lit = Math.round(v * rows), x = W * .05 + i * bw;
+    const v = clamp((A.bars[i * 2] + A.bars[i * 2 + 1]) * .82), lit = Math.round(v * rows), x = W * .05 + i * bw;
     for (let r = 0; r < lit; r++) {
       const p = r / rows;
       c.fillStyle = p > .8 ? '#ff2a1e' : p > .55 ? '#ffc21e' : '#37ff4a';
       c.fillRect(x + gap, top + (rows - 1 - r) * rh + gap / 2, bw - gap * 2, rh - gap);
     }
-    const peak = Math.round(clamp(A.peaks[i * 2] * 2.3) * rows);
+    const peak = Math.round(clamp(A.peaks[i * 2] * 1.64) * rows);
     c.fillStyle = '#fff';
     c.fillRect(x + gap, top + (rows - Math.max(peak, 1)) * rh + gap / 2, bw - gap * 2, rh * .4);
   }
@@ -1223,7 +1278,7 @@ function overlays(t, dt) {
 }
 
 /* ---------- easter eggs ---------- */
-const EGG_COUNT = 34, eggs = new Set(), fx = [], RIM = 'rgba(255,170,90,.4)', mouse = { x: .5, y: .5 };
+const EGG_COUNT = 35, eggs = new Set(), fx = [], RIM = 'rgba(255,170,90,.4)', mouse = { x: .5, y: .5 };
 const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
 let clock = 0, whisperText = '', whisperAt = -99, nextAmbient = 40, witching = false;
 let moonFace = 0, pumpkinWink = 0, spiderHat = 0, batPanic = 0, stripes = 0, juice = 0, typed = '', konamiAt = 0;
@@ -1489,6 +1544,9 @@ function stageClick(e) {
   } else if (sceneIx === 14) {
     grinJolt = clock + .8;
     found('grin', 'it noticed you');
+  } else if (sceneIx === 15) {
+    nunStare = clock + 5;
+    found('convent', 'the whole convent is looking at you');
   }
 }
 
@@ -1693,7 +1751,7 @@ addEventListener('keydown', e => {
   else if (k === 'w') nextClassic();
   else if (k === 'x') toggleShuffle('classic');
   else if (k === 's') toggleShuffle('spooky');
-  else if (e.shiftKey && /^Digit[1-6]$/.test(e.code)) pickScene(8 + +e.code.slice(5));
+  else if (e.shiftKey && /^Digit[1-7]$/.test(e.code)) pickScene(8 + +e.code.slice(5));
   else if (k >= '1' && k <= '9') pickScene(+k - 1);
 });
 
