@@ -36,7 +36,7 @@
   body.party #yt-wrap { margin-top: 0; }
   body.dragging iframe { pointer-events: none; }
   #main { left: 16px; top: 16px; z-index: 2; }
-  #list { left: 16px; top: 240px; z-index: 2; }
+  #list { left: 16px; top: 272px; z-index: 2; }
 
   .bar { display: flex; align-items: center; gap: 8px; height: 20px; padding: 0 6px; cursor: grab;
     color: var(--orange); letter-spacing: 3px; font-size: 16px; touch-action: none;
@@ -86,7 +86,7 @@
   body.party #hint { opacity: 0; }
   @media (max-height: 620px) { #list { left: 432px; top: 16px; } }
   @media (max-width: 860px) {
-    #list { left: 16px; top: 240px; }
+    #list { left: 16px; top: 272px; }
     html, body { overflow: auto; }
     #hint { display: none; }
   }
@@ -114,6 +114,10 @@
     <label class="spacer" for="vol">VOL</label>
     <input type="range" id="vol" min="0" max="100" value="80" style="width:96px">
   </div>
+  <div class="row">
+    <button id="shuffleClassic" class="grow" title="Random classics (X)">CLASSIC SHUFFLE</button>
+    <button id="shuffleSpooky" class="grow" title="Random Halloween scenes (S)">SPOOKY SCARY SHUFFLE</button>
+  </div>
 </section>
 
 <section class="win" id="list" aria-label="Playlist">
@@ -134,7 +138,7 @@
   <div class="row" id="classics" role="group" aria-label="Winamp classic visualizers"></div>
 </section>
 
-<div id="hint">H party mode · F fullscreen · N next scene · W Winamp classics · 1-9 and Shift+1-6 pick a scene</div>
+<div id="hint">H party mode · F fullscreen · N next scene · W classics · X classic shuffle · S spooky shuffle · 1-9 and Shift+1-6 pick a scene</div>
 
 <script>
 // Paste your playlist link or ID here so it loads for everyone without pasting it in.
@@ -365,7 +369,7 @@ function drawBats(t, dt, color) {
 /* ---------- scenes ---------- */
 const DANCERS = 5, headPop = new Array(DANCERS).fill(0);
 let danceStep = 0, dancePhase = 0, houseLit = 0, wispCall = 0;
-let silentCard = 0, twinsAt = 0, tapeFlash = 0, ringBurst = 0, followShift = 0, sunkenStir = -99;
+let silentCard = 0, twinsAt = 0, tapeFlash = 0, ringBurst = 0, followShift = 0, grinJolt = 0;
 const SILENT_CARDS = ['The shadow climbs.', 'Nobody is on the stairs.', 'Do not look up, dear.'];
 const noiseTile = document.createElement('canvas');
 noiseTile.width = noiseTile.height = 256;
@@ -1002,37 +1006,44 @@ const scenes = [
     if (a > .975) { c.fillStyle = `rgba(0,0,0,${clamp((a - .975) / .02)})`; c.fillRect(0, 0, W, H); }
   } },
 
-  { name: 'THE SUNKEN PLACE', draw(t) {
+  { name: 'THE GRIN', draw(t) {
+    const age = (t - sceneAt) % 32, a = age / 32, jolt = clamp((grinJolt - t) / .8);
     c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
-    const shrink = .8 + Math.sin(t * .1) * .2, sw = 300 * U * shrink, sh = 170 * U * shrink, sx = W / 2, sy = H * .17;
-    halo(sx, sy, sw * 1.5, 'rgba(150,180,230,.5)', .5);
-    const screen = c.createLinearGradient(0, sy - sh / 2, 0, sy + sh / 2);
-    screen.addColorStop(0, '#d8e6f4'); screen.addColorStop(1, '#6f8cb0');
-    c.fillStyle = screen; c.fillRect(sx - sw / 2, sy - sh / 2, sw, sh);
-    for (let i = 0; i < 30; i++) {
-      const p = (t * .012 + i * .067) % 1;
-      c.globalAlpha = .25 * Math.sin(p * Math.PI);
-      disc(W * (.08 + ((i * .37) % 1) * .84) + Math.sin(t * .2 + i) * 16 * U, H * (1 - p), 1.4 * U, '#c9d4e4');
+    const reveal = clamp((age - 2) / 12), spread = clamp((age - 8) / 16);
+    const s = H * (.46 + a * .22 + (age > 29 ? (age - 29) * .34 : 0) + jolt * .22);
+    c.save();
+    c.translate(W / 2 + Math.sin(t * .3) * 8 * U, H * .5);
+    c.rotate(Math.sin(t * .17) * .05 + spread * .05);
+    c.scale(s, s);
+    c.globalAlpha = reveal;
+    oval(-.04, -.1, .82, 1.05, '#050505');
+    oval(0, 0, .62, .84, '#b5aea2');
+    oval(0, -.42, .66, .5, '#050505');
+    oval(0, -.2, .56, .42, '#b5aea2');
+    for (const d of [-1, 1]) {
+      oval(d * .26, -.14, .16, .13, '#3a3330');
+      oval(d * .26, -.14, .115, .09, '#e6e2d8');
+      const dx = clamp(mouse.x - .5, -.5, .5) * .1, dy = clamp(mouse.y - .5, -.5, .5) * .07;
+      disc(d * .26 + dx, -.14 + dy, .026, '#000');
     }
-    c.globalAlpha = 1;
-    const fy = H * .62 + Math.sin(t * .35) * 22 * U, fx = W / 2 + Math.sin(t * .22) * 40 * U;
-    const ring = (born, big) => {
-      const q = (t - born) / 7;
-      if (q < 0 || q > 1) return;
-      c.strokeStyle = `rgba(190,205,230,${(1 - q) * .3})`; c.lineWidth = 2 * U;
-      c.beginPath(); c.ellipse(fx, fy, q * 560 * U * big, q * 130 * U * big, 0, 0, 7); c.stroke();
-    };
-    ring(t - (t % 9), 1); ring(sunkenStir, 1.5); ring(sunkenStir + .5, 1.2);
-    c.save(); c.translate(fx, fy); c.rotate(Math.sin(t * .18) * .14);
-    c.strokeStyle = '#d4d9e2'; c.lineCap = 'round'; c.lineWidth = 3.2 * U;
-    const lift = Math.sin(t * .5) * 5 * U, S = U * 1.15;
-    c.beginPath();
-    c.moveTo(0, -18 * S); c.lineTo(0, 22 * S);
-    c.moveTo(0, 22 * S); c.lineTo(-13 * S, 50 * S + lift); c.moveTo(0, 22 * S); c.lineTo(14 * S, 48 * S - lift);
-    c.moveTo(0, -12 * S); c.lineTo(-27 * S, -38 * S - lift); c.moveTo(0, -12 * S); c.lineTo(26 * S, -40 * S + lift);
-    c.stroke();
-    disc(0, -29 * S, 9 * S, '#d4d9e2');
-    c.restore(); c.lineCap = 'butt';
+    poly([[-.03, -.02], [.03, -.02], [.06, .14], [-.06, .14]], '#8c857a');
+    const mw = .2 + spread * .38, my = .3 - spread * .06, low = .07 + spread * .24, lift = spread * .14;
+    const mouth = () => { c.beginPath(); c.moveTo(-mw, my - lift); c.quadraticCurveTo(0, my + low * .55, mw, my - lift); c.quadraticCurveTo(0, my + low * 2, -mw, my - lift); c.closePath(); };
+    mouth(); c.fillStyle = '#ded9cc'; c.fill();
+    c.save(); mouth(); c.clip();
+    c.strokeStyle = '#4b423c'; c.lineWidth = .009;
+    for (let x = -mw; x < mw; x += .052) { c.beginPath(); c.moveTo(x, my - lift); c.lineTo(x, my + low * 2); c.stroke(); }
+    c.beginPath(); c.moveTo(-mw, my - lift * .2); c.quadraticCurveTo(0, my + low * 1.05, mw, my - lift * .2); c.stroke();
+    c.restore();
+    mouth(); c.strokeStyle = '#2a2320'; c.lineWidth = .014; c.stroke();
+    c.restore();
+    const dark = c.createRadialGradient(W / 2, H * .5, s * .36, W / 2, H * .5, s * 1.04);
+    dark.addColorStop(0, 'transparent'); dark.addColorStop(1, '#000');
+    c.fillStyle = dark; c.fillRect(0, 0, W, H);
+    const flick = Math.sin(t * 2.3) * Math.sin(t * 7.1) * Math.sin(t * .9);
+    c.fillStyle = `rgba(0,0,0,${flick > .3 ? .72 : .12})`; c.fillRect(0, 0, W, H);
+    grain(.1, 2);
+    if (age > 30.2) { c.fillStyle = '#000'; c.fillRect(0, 0, W, H); }
   } },
 ];
 
@@ -1093,13 +1104,13 @@ function drawSpectrum() {
   c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
   const n = 32, rows = 28, gap = 3 * U, bw = W * .9 / n, top = H * .08, rh = H * .84 / rows;
   for (let i = 0; i < n; i++) {
-    const v = clamp((A.bars[i * 2] + A.bars[i * 2 + 1]) * .68), lit = Math.round(v * rows), x = W * .05 + i * bw;
+    const v = clamp((A.bars[i * 2] + A.bars[i * 2 + 1]) * 1.15), lit = Math.round(v * rows), x = W * .05 + i * bw;
     for (let r = 0; r < lit; r++) {
       const p = r / rows;
       c.fillStyle = p > .8 ? '#ff2a1e' : p > .55 ? '#ffc21e' : '#37ff4a';
       c.fillRect(x + gap, top + (rows - 1 - r) * rh + gap / 2, bw - gap * 2, rh - gap);
     }
-    const peak = Math.round(clamp(A.peaks[i * 2] * 1.36) * rows);
+    const peak = Math.round(clamp(A.peaks[i * 2] * 2.3) * rows);
     c.fillStyle = '#fff';
     c.fillRect(x + gap, top + (rows - Math.max(peak, 1)) * rh + gap / 2, bw - gap * 2, rh * .4);
   }
@@ -1155,6 +1166,28 @@ function drawScope(t) {
 }
 
 const CLASSICS = [['SWIRL', drawSwirl], ['BARS', drawSpectrum], ['PLASMA', drawPlasma], ['KALEIDO', drawKaleido], ['SCOPE', drawScope]];
+
+// Each shuffle plays everything once before repeating.
+const SHUFFLE_SECONDS = { classic: 25, spooky: 40 };
+let shuffleMode = '', shuffleAt = 0, shuffleBag = [];
+
+function shuffleStep() {
+  const spooky = shuffleMode === 'spooky', current = spooky ? (classic < 0 ? sceneIx : -1) : classic;
+  if (!shuffleBag.length) {
+    shuffleBag = [...(spooky ? scenes : CLASSICS).keys()].filter(n => n !== current);
+    shuffleBag.sort(() => Math.random() - .5);
+  }
+  const n = shuffleBag.pop();
+  spooky ? setScene(n, clock) : setClassic(n);
+  shuffleAt = clock + SHUFFLE_SECONDS[shuffleMode];
+}
+
+function setShuffle(mode) {
+  shuffleMode = mode; shuffleBag = [];
+  $('shuffleClassic').classList.toggle('on', mode === 'classic');
+  $('shuffleSpooky').classList.toggle('on', mode === 'spooky');
+  if (mode) shuffleStep();
+}
 
 function setScene(i, t) {
   if (classic >= 0) setClassic(-1);
@@ -1454,8 +1487,8 @@ function stageClick(e) {
     followShift += 5;
     found('follow', 'that only made it closer');
   } else if (sceneIx === 14) {
-    sunkenStir = clock;
-    found('sunken', 'tink tink tink');
+    grinJolt = clock + .8;
+    found('grin', 'it noticed you');
   }
 }
 
@@ -1616,12 +1649,15 @@ const nextScene = () => setScene(sceneIx + 1, performance.now() / 1000);
 $('party').onclick = toggleParty;
 $('full').onclick = toggleFull;
 $('scene').onclick = nextScene;
-const leaveClassic = () => setScene(sceneIx, performance.now() / 1000);
-const nextClassic = () => classic + 1 < CLASSICS.length ? setClassic(classic + 1) : leaveClassic();
+const pickScene = i => { setShuffle(''); setScene(i, performance.now() / 1000); };
+const nextClassic = () => { setShuffle(''); classic + 1 < CLASSICS.length ? setClassic(classic + 1) : setScene(sceneIx, performance.now() / 1000); };
+const toggleShuffle = mode => setShuffle(shuffleMode === mode ? '' : mode);
+$('shuffleClassic').onclick = () => toggleShuffle('classic');
+$('shuffleSpooky').onclick = () => toggleShuffle('spooky');
 CLASSICS.forEach(([name], i) => {
   const b = document.createElement('button');
   b.textContent = name;
-  b.onclick = () => classic === i ? leaveClassic() : setClassic(i);
+  b.onclick = () => { setShuffle(''); classic === i ? setScene(sceneIx, performance.now() / 1000) : setClassic(i); };
   $('classics').append(b);
 });
 scenes.forEach((s, i) => {
@@ -1629,7 +1665,7 @@ scenes.forEach((s, i) => {
   b.textContent = i + 1;
   b.title = s.name;
   b.setAttribute('aria-label', `Scene ${i + 1}: ${s.name}`);
-  b.onclick = () => setScene(i, performance.now() / 1000);
+  b.onclick = () => pickScene(i);
   $('picker').append(b);
 });
 stage.ondblclick = toggleParty;
@@ -1655,8 +1691,10 @@ addEventListener('keydown', e => {
   else if (k === 'f') toggleFull();
   else if (k === 'n') nextScene();
   else if (k === 'w') nextClassic();
-  else if (e.shiftKey && /^Digit[1-6]$/.test(e.code)) setScene(8 + +e.code.slice(5), performance.now() / 1000);
-  else if (k >= '1' && k <= '9') setScene(+k - 1, performance.now() / 1000);
+  else if (k === 'x') toggleShuffle('classic');
+  else if (k === 's') toggleShuffle('spooky');
+  else if (e.shiftKey && /^Digit[1-6]$/.test(e.code)) pickScene(8 + +e.code.slice(5));
+  else if (k >= '1' && k <= '9') pickScene(+k - 1);
 });
 
 for (const bar of document.querySelectorAll('[data-drag]')) {
@@ -1680,9 +1718,10 @@ function frame(ms) {
   last = t;
   readAudio(t, dt * 60);
   clock = t;
+  if (shuffleMode && t > shuffleAt) shuffleStep();
   if (classic >= 0) CLASSICS[classic][1](t);
   else {
-    if (t - sceneAt > SCENE_SECONDS && A.beat) setScene(sceneIx + 1, t);
+    if (!shuffleMode && t - sceneAt > SCENE_SECONDS && A.beat) setScene(sceneIx + 1, t);
     scenes[sceneIx].draw(t, dt);
     runEggs(t, dt);
   }
@@ -1707,7 +1746,7 @@ document.head.append(api);
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
 console.log('%c  .-.\n (o o) boo!\n | O |\n |   |\n \'~~~\'  try typing a word or two', 'color:#ff7a18;font:14px monospace');
-window.ghoulamp = { audio: A, yt, setScene, eggs, ambient, songEgg };
+window.ghoulamp = { audio: A, yt, setScene, eggs, ambient, songEgg, shuffleStep };
 </script>
 </body>
 </html>
