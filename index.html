@@ -21,8 +21,9 @@
   #main.shade > :not(.bar) { display: none; }
   body.classic #stage, body.stark #stage, body.stream #stage { filter: none; }
   #picker, .vis-row { gap: 2px; }
-  #chill { flex-wrap: wrap; }
-  #chill button { flex: 1 1 23%; }
+  #chill, #toggles { flex-wrap: wrap; }
+  #chill button, #toggles button { flex: 1 1 23%; }
+  body.no-scan #scan { display: none; }
   #list[data-frame=chill] { background: #e8dcc6; border-color: #fff4e0; border-radius: 10px; box-shadow: 0 6px 22px rgba(0,0,0,.45); }
   #list[data-frame=chill] .bar { background: #e8dcc6; color: #6a5238; letter-spacing: 2px; }
   #list[data-frame=chill] .bar span { background: none; }
@@ -203,6 +204,8 @@
   <div class="row vis-row" id="wmp9" role="group" aria-label="Windows Media Player 9 visualizers"></div>
   <div class="row"><label>WINDOWS XP</label></div>
   <div class="row vis-row" id="xp" role="group" aria-label="Windows XP visualizers"></div>
+  <div class="row"><label>SHOW</label></div>
+  <div class="row vis-row" id="toggles" role="group" aria-label="Show or hide elements"></div>
   <div id="stats"><span><i>666</i> kbps</span><span><i>31</i> kHz</span><span>scene <i id="sceneName">-</i></span><span id="trackNo">-/-</span></div>
   <div id="hint">Q menu · H bar · F full · Esc leave · N next scene · W visualizers · S spooky · X classic · 1-9, Shift+1-8 scenes</div>
 </section>
@@ -564,12 +567,76 @@ const chat = { lines: [], next: 0, alert: '', alertAt: -99, nextAlert: 12 };
 
 const chatFont = size => `${size * U}px VT323, monospace`;
 
-// Mixes on-topic lines, off-topic chatter and replies, and fills in {tokens} from the game.
+/* Chat grammar in Backus-Naur Form. Each <rule> expands to one |-separated choice, picked at random.
+   {tokens} come from the game. An empty choice means "say nothing here". */
+const CHAT_BNF = String.raw`
+<walk> ::= <opinion> <place> | why is <the_place> so <adj> | <hero> <walks> <adv> | who <built> <the_place> | <the_place> is <very> <adj> | we <need> <thing> | <hero> should <do> | this <place> needs <thing> | <open>we are <lost> | <open><hero> has <very> <adj> shoes | B{floor}F is <very> <adj> | <open>i <feel> <the_place>
+<puzzle> ::= <open>its the <colour> one | <open>try the <colour> one | <hero> has <very> <adj> ideas | <open>this puzzle is <very> <adj> | who <built> this puzzle | <open><hero> should <do> | <open>i <feel> this puzzle
+<streamer> ::= ok chat <stream_a> | <open><hero> is <very> <adj> | <open>we <need> <thing> | hold on chat, <stream_a> | <open>i <feel> <the_place> | thanks for the sub! | big if true, chat | this is fine | B{floor}F, new record? | {gold} GIL. retiring soon | no backseating please | who said <colour> | one more run, then bed
+<stream_a> ::= watch this | i got this | trust me | this is a good idea | stay hydrated | dont clip that | i meant to do that | here we go
+<colour> ::= red | blue | green | yellow | left | right | middle
+<the_place> ::= the <place> | this <place> | that <place>
+<fight> ::= <hit> that {foe}<bang> | <hero> <hits> the {foe}<bang> | {foe} is <very> <adj> | <open>that {foe} <insult> | who let the {foe} in | <hero> <please> | <open>{foe} has <thing> | never trust a {foe} | <cheer><bang> | {foe} looks <adj> | <open>i <feel> that {foe}
+<boss> ::= {foe} is <very> <adj> | <cheer><bang> | everyone <lockin><bang> | this {foe} <insult> | <hero> <please> | <open>we need <thing> for this | <open>i <feel> {foe} | B{floor}F boss looks <adj>
+<pause> ::= <loot_q> | <open>give it to <hero> | that <item> looks <adj> | <cheer><bang> | <open>we <need> <thing> not <item>s | <open>i <feel> that <item> | <hero> deserves <thing>
+<spoils> ::= <cheer><bang> | <hero> was <very> <adj> | <open>that {foe} never had a chance | <open>give <hero> <thing> | <hero> <please> keep doing that | <open>{gold} GIL buys <thing>
+<wiped> ::= <open>we will miss <hero> | <hero> was <very> <adj> | <open>press <key> for <hero> | run {run} was <very> <adj> | <open>it was the <place>
+<hallway> ::= <opinion> <place> | this <place> is <very> <adj> | who <built> <the_place> | <open>we are <lost> | <open>i <feel> these bricks
+<panic> ::= <run_cmd><bang> | it is <very> <close><bang> | <open>i <feel> this | why is it so <adj>
+<death> ::= <open>press <key> for the streamer | that was <very> <adj> | <open>death {deaths} was <adj>
+<open> ::= | | | ok  | honestly  | lowkey  | not gonna lie  | chat  | wait  | bro  | ngl  | friends  | ah yes  | hmm  |
+<opinion> ::= i love <the> | i hate <the> | nobody asked for <the> | shoutout to <the> | respect to <the> | never trust <the> | thinking about <the>
+<the> ::= the | this | that | our
+<place> ::= dungeon | hallway | tileset | floor | dead end | side room | rug | wall | torch | corridor | staircase | statue | crypt | basement
+<adj> ::= cursed | cozy | sketchy | majestic | damp | suspicious | legendary | moist | humble | chunky | gorgeous | haunted | overrated | underrated | built | feral | polite | sus | unhinged | wholesome
+<very> ::= very | extremely | kinda | so | weirdly | suspiciously | deeply | a little | truly | barely
+<adv> ::= with purpose | like a champ | for no reason | very slowly | with confidence | like a duck | suspiciously | heroically
+<hero> ::= {tank} | {thief} | {healer} | {mage} | {pet}
+<walks> ::= walks | struts | scoots | waddles | marches | strolls | shuffles | tiptoes
+<built> ::= built | designed | approved | decorated | paid for | cleans
+<need> ::= need | deserve | could use | are owed | demand
+<thing> ::= a nap | more potions | snacks | a map | a raise | better shoes | a hug | soup | a sandwich | emotional support | a tiny hat | a day off | more torches | a bigger sword | health insurance
+<do> ::= take a nap | check that wall | apologize | drink water | go left | go right | call their mom | stretch first | lead the way
+<lost> ::= lost | so lost | walking in circles | fine | not fine | doomed | making progress
+<feel> ::= respect | fear | believe in | am scared of | am obsessed with | would die for | do not trust
+<hit> ::= bonk | smack | yeet | destroy | delete | bully | hug | end | tickle
+<hits> ::= bonked | smacked | yeeted | deleted | humbled | bullied | destroyed | spanked
+<insult> ::= has no friends | smells like cheese | owes me money | is a coward | pays no taxes | skipped leg day | is just a guy | needs therapy
+<please> ::= please | i am begging | do it for me | do not miss | you got this | my hero | lock in
+<cheer> ::= lets go | gg | huge | so good | what a play | clean | absolute cinema | big if true | wow | no way
+<bang> ::= | | ! | !! | !!! |  lol |  fr
+<lockin> ::= lock in | focus up | hold hands | pray | stay calm | panic now
+<loot_q> ::= is that <item> <adj> | what does the <item> do | <open>sell the <item> | <open>equip the <item> | is the <item> <adj>
+<item> ::= sword | potion | hat | boot | shield | ring | spoon | rock
+<key> ::= F | X | 7
+<run_cmd> ::= run | go go go | move | sprint | do not stop | turn left | leave
+<close> ::= close | near | right there | behind you | fast
+`;
+const CHAT_RULES = Object.fromEntries(CHAT_BNF.trim().split('\n').map(line => {
+  const [head, body] = line.split('::=');
+  return [head.trim().slice(1, -1), body.split('|').map(alt => alt.replace(/^ /, '').replace(/ $/, ''))];
+}));
+const CHAT_RULE_FOR = { walk: 'walk', fight: 'fight', boss: 'boss', pause: 'pause', spoils: 'spoils', wiped: 'wiped', think: 'puzzle', calm: 'hallway', panic: 'panic', dead: 'death' };
+
+function chatExpand(symbol, depth = 0) {
+  const choices = CHAT_RULES[symbol];
+  if (!choices || depth > 8) return '';
+  return choices[Math.floor(rnd(0, choices.length))].replace(/<(\w+)>/g, (_, name) => chatExpand(name, depth + 1));
+}
+
+// Mixes on-topic lines, off-topic chatter, replies and generated sentences, and fills in {tokens} from the game.
 function chatLine(pool, vars) {
   const pick = list => list[Math.floor(rnd(0, list.length))], recent = chat.lines.slice(-10), roll = Math.random();
   const prev = recent[recent.length - 1];
   if (prev && roll < .13) return { raw: 'reply', text: `@${prev.who} ${pick(CHAT_REPLIES)}` };
-  const list = roll < .36 ? CHAT_ANY : pool;
+  const fill = text => text.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? key).replace(/ {2,}/g, ' ').trim();
+  if (vars.rule && roll < .72) {
+    for (let i = 0; i < 12; i++) {
+      const text = fill(chatExpand(CHAT_RULE_FOR[vars.rule]));
+      if (text && text.length <= 33) return { raw: text, text };
+    }
+  }
+  const list = roll < .82 ? CHAT_ANY : pool;
   let raw = pick(list);
   for (let i = 0; i < 12 && recent.some(l => l.raw === raw); i++) raw = pick(list);
   return { raw, text: raw.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? key) };
@@ -591,6 +658,7 @@ function chatTick(t, pool, pace, vars = {}) {
 }
 
 function drawChatPanel(share) {
+  if (!SHOW.chat) return;
   const pad = 10 * U, pw = 300 * U, ph = H * share, px = W - pw - 14 * U, py = H * .1;
   c.fillStyle = 'rgba(12,6,22,.78)'; c.fillRect(px, py, pw, ph);
   c.fillStyle = '#e23bff'; c.fillRect(px, py, pw, 3 * U);
@@ -608,7 +676,7 @@ function drawChatPanel(share) {
 
 function drawChatAlert(t) {
   const age = t - chat.alertAt;
-  if (age >= 5) return;
+  if (age >= 5 || !SHOW.chat) return;
   c.globalAlpha = clamp(Math.min(age * 3, (5 - age) * 2));
   c.textAlign = 'center';
   c.fillStyle = 'rgba(226,59,255,.9)'; c.fillRect(W * .5 - 240 * U, H * .05, 480 * U, 42 * U);
@@ -617,9 +685,10 @@ function drawChatAlert(t) {
 }
 
 function drawStreamHud(t, danger, caught) {
-  chatTick(t, caught ? CHAT_DEAD : danger > .35 ? CHAT_PANIC : CHAT_CALM, caught ? .2 : 1 - danger * .7, { deaths: mz.deaths });
+  chatTick(t, caught ? CHAT_DEAD : danger > .35 ? CHAT_PANIC : CHAT_CALM, caught ? .2 : 1 - danger * .7, { deaths: mz.deaths, rule: caught ? 'dead' : danger > .35 ? 'panic' : 'calm' });
   const f = chatFont;
   drawChatPanel(.62);
+  if (!SHOW.stats) return drawChatAlert(t);
   c.fillStyle = 'rgba(12,6,22,.78)'; c.fillRect(14 * U, H * .07, 430 * U, 62 * U);
   c.fillStyle = '#e3122a'; c.fillRect(22 * U, H * .07 + 9 * U, 62 * U, 24 * U);
   c.fillStyle = '#fff'; c.font = f(22); c.fillText('LIVE', 34 * U, H * .07 + 28 * U);
@@ -2040,12 +2109,17 @@ function drawStarry(t) {
 }
 
 /* QUEST: a self-playing 8-bit dungeon crawl. Original sprites in an old JRPG style. */
-const QW = 320, QH = 180, QMAP = 44, QTILE = 16;
+const QW = 320, QH = 180, QMAP = 52, QTILE = 16;
 const qLow = document.createElement('canvas');
 qLow.width = QW; qLow.height = QH;
 const qc = qLow.getContext('2d');
 qc.imageSmoothingEnabled = false;
 const qCache = new Map();
+
+// Every on-screen element can be switched off from the menu.
+const SHOW_LABELS = { chat: 'CHAT', streamer: 'STREAMER', stats: 'STATS', log: 'LOG', lights: 'LIGHTING', effects: 'EFFECTS', pets: 'PET', banners: 'BANNERS', scan: 'SCANLINES' };
+const SHOW = Object.fromEntries(Object.keys(SHOW_LABELS).map(key => [key, true]));
+try { Object.assign(SHOW, JSON.parse(store.get('winvamp.show') || '{}')); } catch {}
 
 const Q_HERO = ['....1111....', '...111111...', '...122221...', '...124242...', '...122221...', '....3333....', '..23333332..', '..23333332..', '...333333...', '...333333...', '...44..44...', '...44..44...'];
 const Q_HERO_B = [...Q_HERO.slice(0, 10), '...44.......', '.......44...'];
@@ -2064,10 +2138,10 @@ const Q_FOES = [
 const Q_BOSSES = [{ name: 'CAVE KING', rows: Q_BEAST, col: '#c8a020' }, { name: 'FROST WYRM', rows: Q_BEAST, col: '#60b8e8' }, { name: 'ASH DRAGON', rows: Q_BEAST, col: '#e04020' }];
 const Q_GEAR = ['RUSTY', 'IRON', 'STEEL', 'SILVER', 'RUNED', 'MITHRIL', 'FLAME', 'DRAGON', 'STAR'];
 const Q_THEMES = [
-  { name: 'EARTH CAVE', floor: '#3a2c20', fleck: '#4a3a2c', hi: '#8a5a34', mid: '#6a4026', lo: '#2a180e' },
-  { name: 'ICE VAULT', floor: '#20304a', fleck: '#2e4264', hi: '#6a9ad0', mid: '#44709e', lo: '#16243c' },
-  { name: 'MAGMA DEEP', floor: '#3a1a1a', fleck: '#4e2622', hi: '#c85a30', mid: '#8a3420', lo: '#2a0e0a' },
-  { name: 'MOSS CRYPT', floor: '#1e3024', fleck: '#2a4232', hi: '#5a9a60', mid: '#386a44', lo: '#122418' },
+  { name: 'EARTH CAVE', floor: '#3a2c20', fleck: '#4a3a2c', hi: '#8a5a34', mid: '#6a4026', lo: '#2a180e', sky: ['#1a120c', '#5a3a22'], motes: 'dust', water: '#28506a', props: ['bones', 'rocks', 'urn', 'mushroom', 'rocks', 'barrel'] },
+  { name: 'ICE VAULT', floor: '#20304a', fleck: '#2e4264', hi: '#6a9ad0', mid: '#44709e', lo: '#16243c', sky: ['#0c1a34', '#3e74b0'], motes: 'snow', water: '#7ac4e8', props: ['crystal', 'icicle', 'rocks', 'crystal', 'urn'] },
+  { name: 'MAGMA DEEP', floor: '#3a1a1a', fleck: '#4e2622', hi: '#c85a30', mid: '#8a3420', lo: '#2a0e0a', sky: ['#1c0606', '#a8341a'], motes: 'ember', water: '#e8641e', props: ['skull', 'rocks', 'brazier', 'bones', 'skull'] },
+  { name: 'MOSS CRYPT', floor: '#1e3024', fleck: '#2a4232', hi: '#5a9a60', mid: '#386a44', lo: '#122418', sky: ['#081410', '#2e6a4a'], motes: 'fly', water: '#2e7a6a', props: ['mushroom', 'candle', 'bones', 'mushroom', 'urn', 'skull'] },
 ];
 const Q_CHAT = {
   walk: [
@@ -2093,6 +2167,10 @@ const Q_CHAT = {
     'GG', 'EZ', 'clean', 'level up when', 'too easy', 'next floor pls', 'free xp', 'nice one team', '{tank} MVP', '{healer} MVP', '{thief} MVP', 'was that the {foe}', 'we move', 'gold gold gold', 'ez clap',
     'barely survived tbh', 'they didnt stand a chance', 'i was worried for a sec', 'farm them again', '{gold} GIL lets go', 'not even close',
   ],
+  think: [
+    'its the left one', 'no the other one', 'just hit it', 'i know this one', 'use your brain {tank}', 'puzzles in a dungeon?', 'who designs these', 'try the red one', 'guide says go back', 'this is a stat check',
+    'imagine failing this', 'i could do this', 'my kid solved this faster', 'zap incoming', 'ok thats clever', 'big brain time', 'no spoilers chat', 'the stairs are RIGHT there',
+  ],
   wiped: [
     'F', 'F', 'FFFFFF', 'run it back', 'bro got got', 'unlucky', 'rip {tank}', 'rip {healer}', 'pour one out', 'B{floor}F was a good run', 'best is still B{best}F', 'should have healed', 'told you to use potions',
     'o7', 'thanks for the memories', 'that was run {run}', 'new party when', 'gone but not forgotten', 'i miss them already', 'who was tanking', 'character development', 'skill issue honestly',
@@ -2102,11 +2180,11 @@ const Q_CHAT = {
 function questChatVars() {
   const alive = q.party.filter(h => h.hp), foes = q.battle?.foes.filter(f => !f.dead) || [];
   return {
-    hero: (alive[Math.floor(rnd(0, alive.length))] || q.party[0]).name, tank: q.names[0], thief: q.names[1], healer: q.names[2], mage: q.names[3],
+    hero: (alive[Math.floor(rnd(0, alive.length))] || q.party[0]).name, tank: q.names[0], thief: q.names[1], healer: q.names[2], mage: q.names[3], pet: q.pet.name,
     foe: foes[0]?.name ?? 'monster', floor: q.floor, best: Math.max(q.best, q.floor), run: q.run, gold: q.gold, potions: q.potions,
   };
 }
-const q = { run: 1, best: 0, state: 'walk', map: null, floor: 0, route: [], at: 0, gold: 0, potions: 2, steps: 0, log: [], party: [], battle: null, opened: 0, wins: 0, fade: 1, wait: 0, x: 0, y: 0, dx: 1, dy: 0, step: 0, flip: false };
+const q = { run: 1, best: 0, sparks: [], decor: [], rugs: [], pools: [], critters: [], trail: [], banner: null, shake: 0, swirl: 0, names: [], puzzle: null, says: '', saysAt: -99, nextSay: 5, state: 'walk', map: null, floor: 0, route: [], at: 0, gold: 0, potions: 2, steps: 0, log: [], party: [], battle: null, opened: 0, wins: 0, fade: 1, wait: 0, x: 0, y: 0, dx: 1, dy: 0, step: 0, flip: false };
 
 function qSprite(key, rows, pal) {
   const id = `${key}${Object.values(pal).join('')}`;
@@ -2121,66 +2199,325 @@ function qSprite(key, rows, pal) {
   return s;
 }
 
-function qTile(theme, wall) {
-  const id = `tile${theme.name}${wall}`;
+function qTile(theme, kind) {
+  const id = `tile${theme.name}${kind}`;
   if (qCache.has(id)) return qCache.get(id);
   const s = document.createElement('canvas');
   s.width = s.height = QTILE;
   const x = s.getContext('2d');
-  if (wall) {
+  if (kind === 'face') {
     x.fillStyle = theme.lo; x.fillRect(0, 0, 16, 16);
     for (let r = 0; r < 4; r++) for (let i = -1; i < 2; i++) {
       x.fillStyle = (r + i) % 2 ? theme.hi : theme.mid;
       x.fillRect(i * 8 + (r % 2 ? 4 : 0) + 1, r * 4 + 1, 6, 2);
     }
+    x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(0, 13, 16, 3);
+  } else if (kind === 'top') {
+    x.fillStyle = theme.lo; x.fillRect(0, 0, 16, 16);
+    x.fillStyle = theme.mid; x.globalAlpha = .35;
+    for (const [a, b] of [[2, 3], [9, 1], [12, 8], [5, 11], [14, 13]]) x.fillRect(a, b, 2, 2);
   } else {
     x.fillStyle = theme.floor; x.fillRect(0, 0, 16, 16);
     x.fillStyle = theme.fleck;
-    for (const [a, b] of [[3, 2], [11, 5], [6, 11], [13, 13], [1, 9]]) x.fillRect(a, b, 2, 1);
+    const marks = kind === 'floor2' ? [[2, 4], [9, 2], [12, 10], [4, 12], [7, 7]] : [[3, 2], [11, 5], [6, 11], [13, 13], [1, 9]];
+    for (const [a, b] of marks) x.fillRect(a, b, 3, 1);
+    if (kind === 'floor2') { x.fillStyle = theme.lo; x.fillRect(0, 0, 16, 1); x.fillRect(0, 0, 1, 16); }
   }
   qCache.set(id, s);
   return s;
 }
+
+const qGlow = document.createElement('canvas');
+qGlow.width = qGlow.height = 64;
+{
+  const g = qGlow.getContext('2d'), r = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.55, 'rgba(255,255,255,.55)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+}
+function qTint(col) {
+  const id = `glow${col}`;
+  if (qCache.has(id)) return qCache.get(id);
+  const s = document.createElement('canvas');
+  s.width = s.height = 64;
+  const g = s.getContext('2d'), r = g.createRadialGradient(32, 32, 1, 32, 32, 32);
+  r.addColorStop(0, col); r.addColorStop(1, `${col}00`);
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+  qCache.set(id, s);
+  return s;
+}
+const qDark = document.createElement('canvas');
+qDark.width = QW; qDark.height = QH;
+const qd = qDark.getContext('2d');
+
+// Small hand-placed pixel props, all drawn from rectangles.
+function qProp(kind, x, y, t, ph, th) {
+  const r = (col, a, b, w, h) => { qc.fillStyle = col; qc.fillRect(x + a, y + b, w, h); };
+  const flick = Math.sin(t * 9 + ph) > 0;
+  if (kind === 'torch') {
+    r('#3a2414', 7, 7, 2, 6);
+    r('#ff8a1e', 6, 3, 4, 4); r(flick ? '#ffe08a' : '#ffc040', 7, flick ? 2 : 3, 2, 3);
+  } else if (kind === 'banner') {
+    r('#20140c', 3, 1, 10, 1);
+    r(th.hi, 4, 2, 8, 9); r('#f0d060', 7, 4, 2, 4);
+    r(th.hi, 4, 11, 2, 1); r(th.hi, 10, 11, 2, 1);
+  } else if (kind === 'crack') {
+    r('#0a0604', 5, 2, 1, 3); r('#0a0604', 6, 5, 2, 1); r('#0a0604', 8, 6, 1, 4); r('#0a0604', 7, 10, 1, 2);
+  } else if (kind === 'moss') {
+    r('#3a7a3e', 1, 0, 6, 2); r('#3a7a3e', 3, 2, 2, 3); r('#5a9a4e', 10, 0, 4, 2); r('#5a9a4e', 11, 2, 1, 2);
+  } else if (kind === 'pillar') {
+    r('#000', 2, 13, 12, 3);
+    r(th.mid, 3, 1, 10, 13); r(th.hi, 4, 2, 3, 11); r(th.lo, 11, 2, 2, 11); r(th.hi, 2, 0, 12, 2);
+  } else if (kind === 'statue') {
+    r('#000', 2, 13, 12, 3);
+    r('#6a6a78', 3, 10, 10, 4); r('#8a8a98', 5, 3, 6, 7); r('#a8a8b8', 6, 0, 4, 3); r('#ff3a2a', 6, 1, 1, 1); r('#ff3a2a', 9, 1, 1, 1);
+  } else if (kind === 'bones') {
+    r('#d8d0b8', 3, 8, 6, 1); r('#d8d0b8', 5, 6, 1, 5); r('#d8d0b8', 10, 11, 3, 1); r('#a8a090', 2, 12, 2, 1);
+  } else if (kind === 'skull') {
+    r('#d8d0b8', 5, 7, 6, 5); r('#d8d0b8', 6, 12, 4, 1); r('#201410', 6, 9, 1, 2); r('#201410', 9, 9, 1, 2);
+  } else if (kind === 'rocks') {
+    r(th.mid, 3, 10, 5, 3); r(th.hi, 4, 9, 2, 1); r(th.mid, 10, 12, 3, 2);
+  } else if (kind === 'urn') {
+    r('#000', 4, 13, 8, 2); r('#8a4a2a', 5, 7, 6, 6); r('#b06a3a', 6, 8, 2, 3); r('#5a2a18', 6, 5, 4, 2);
+  } else if (kind === 'barrel') {
+    r('#000', 3, 13, 10, 2); r('#7a4a22', 4, 4, 8, 10); r('#3a2410', 4, 6, 8, 1); r('#3a2410', 4, 11, 8, 1); r('#a06a34', 5, 5, 2, 8);
+  } else if (kind === 'mushroom') {
+    r('#e0d8c0', 7, 9, 2, 4); r('#d84a4a', 4, 6, 8, 3); r('#fff0e0', 6, 7, 1, 1); r('#fff0e0', 10, 7, 1, 1);
+  } else if (kind === 'crystal') {
+    r('#3e8ad0', 6, 5, 4, 8); r('#9fe0ff', 7, 3, 2, 8); r('#ffffff', 7, 4, 1, 3); r('#3e8ad0', 10, 9, 2, 4);
+  } else if (kind === 'icicle') {
+    r('#9fd8f0', 4, 8, 3, 5); r('#d8f4ff', 5, 6, 1, 2); r('#9fd8f0', 10, 10, 2, 3);
+  } else if (kind === 'candle') {
+    r('#e8e0c8', 7, 9, 2, 4); r(flick ? '#ffe08a' : '#ff9a30', 7, 6, 2, 3);
+  } else if (kind === 'shelf') {
+    r('#3a2410', 1, 1, 14, 13); r('#20140a', 2, 2, 12, 5); r('#20140a', 2, 8, 12, 5);
+    for (let i = 0; i < 6; i++) { r(['#a83a3a', '#3a68a8', '#3a8a5a', '#c8a03a'][i % 4], 2 + i * 2, 3, 2, 4); r(['#3a8a5a', '#c8a03a', '#a83a3a', '#7a4ab0'][i % 4], 2 + i * 2, 9, 2, 4); }
+  } else if (kind === 'coffin') {
+    r('#000', 3, 13, 10, 2); r('#4a3020', 4, 1, 8, 13); r('#6a4a30', 5, 2, 6, 11); r('#d8c090', 7, 4, 2, 7); r('#d8c090', 5, 6, 6, 2);
+  } else if (kind === 'gold') {
+    r('#a87818', 2, 10, 12, 4); r('#e8b830', 3, 8, 10, 3); r('#ffe080', 5, 6, 6, 3);
+    if (flick) r('#fff', 8, 7, 1, 1);
+  } else if (kind === 'brazier') {
+    r('#3a3a44', 5, 9, 6, 2); r('#2a2a34', 7, 11, 2, 3);
+    r('#ff6a1e', 5, 5, 6, 4); r(flick ? '#ffe08a' : '#ffc040', 7, 3, 2, 4);
+  }
+}
+const Q_LIGHTS = { torch: [62, '#ffb050'], candle: [34, '#ffb050'], brazier: [56, '#ff8030'], crystal: [46, '#7ac8ff'], mushroom: [18, '#ff9090'] };
 
 function qSay(text) {
   q.log.push(text);
   if (q.log.length > 3) q.log.shift();
 }
 
+// One job is drawn from each role, so every run has a front line, a striker, a healer and a caster.
+const Q_JOBS = {
+  tank: [
+    { job: 'FIGHTER', hp: 34, atk: 8, def: 4, hair: '#c83020', tunic: '#d8a030', hat: '', weapon: 'SWORD' },
+    { job: 'KNIGHT', hp: 40, atk: 7, def: 6, hair: '#b8c0d0', tunic: '#7a8aa8', hat: 'helm', weapon: 'LANCE' },
+    { job: 'MONK', hp: 30, atk: 9, def: 3, hair: '#f0c8a0', tunic: '#e87a1e', hat: 'bald', weapon: 'CESTUS' },
+    { job: 'SAMURAI', hp: 32, atk: 10, def: 3, hair: '#202028', tunic: '#a82a2a', hat: 'topknot', weapon: 'KATANA' },
+  ],
+  rogue: [
+    { job: 'THIEF', hp: 26, atk: 7, def: 3, hair: '#30a040', tunic: '#208050', hat: 'bandana', weapon: 'KNIFE' },
+    { job: 'RANGER', hp: 28, atk: 7, def: 3, hair: '#6a4a24', tunic: '#4a7a3a', hat: 'feather', weapon: 'BOW' },
+    { job: 'NINJA', hp: 24, atk: 8, def: 3, hair: '#20202c', tunic: '#30304a', hat: 'mask', weapon: 'SHURIKEN' },
+    { job: 'BARD', hp: 26, atk: 6, def: 3, hair: '#e8a040', tunic: '#a040b0', hat: 'feather', weapon: 'LUTE' },
+  ],
+  heal: [
+    { job: 'W.MAGE', hp: 22, atk: 3, def: 2, mp: 12, hair: '#f0f0f0', tunic: '#d84060', hat: 'hood', weapon: 'STAFF', spell: 'CURE' },
+    { job: 'DRUID', hp: 24, atk: 4, def: 2, mp: 12, hair: '#6ac04a', tunic: '#3a7a4a', hat: 'hood', weapon: 'BRANCH', spell: 'REGROW' },
+    { job: 'CLERIC', hp: 24, atk: 3, def: 3, mp: 12, hair: '#f0e0a0', tunic: '#e8e8f0', hat: 'mitre', weapon: 'MACE', spell: 'MEND' },
+    { job: 'PALADIN', hp: 28, atk: 6, def: 4, mp: 10, hair: '#f0c040', tunic: '#c8c8e0', hat: 'helm', weapon: 'BLADE', spell: 'LIGHT' },
+  ],
+  cast: [
+    { job: 'B.MAGE', hp: 20, atk: 3, def: 2, mp: 12, hair: '#f0c020', tunic: '#3848c0', hat: 'wizard', weapon: 'ROD', spell: 'FIRE' },
+    { job: 'FROSTMAGE', hp: 20, atk: 3, def: 2, mp: 12, hair: '#a0e0ff', tunic: '#3a90c8', hat: 'wizard', weapon: 'WAND', spell: 'ICE' },
+    { job: 'STORMCALL', hp: 20, atk: 3, def: 2, mp: 12, hair: '#f0f060', tunic: '#5a4ab0', hat: 'hood', weapon: 'ORB', spell: 'BOLT' },
+    { job: 'NECRO', hp: 22, atk: 3, def: 2, mp: 12, hair: '#a0f0a0', tunic: '#2a1a3a', hat: 'hood', weapon: 'SKULL', spell: 'DRAIN' },
+  ],
+};
+const Q_NAMES = {
+  tank: ['ARUS', 'BRAM', 'DUKE', 'ROLF', 'KAI', 'GORM', 'TESS', 'HILDA'], rogue: ['LYRA', 'FINN', 'SHAE', 'RIKO', 'WREN', 'JINX', 'COBB', 'NELL'],
+  heal: ['MIRA', 'ELLA', 'NOA', 'SAGE', 'ROSA', 'FERN', 'THEO', 'IVY'], cast: ['ZOT', 'VEX', 'MOX', 'ORIN', 'TAZ', 'NYX', 'QUILL', 'ASH'],
+};
+const Q_PETS = [
+  { kind: 'CAT', body: '#f0a040', dark: '#a86020', verb: 'scratches', names: ['MITTENS', 'SOOT', 'BEANS'] },
+  { kind: 'DOG', body: '#c89a60', dark: '#7a5a34', verb: 'bites', names: ['BISCUIT', 'WAFFLES', 'REX'] },
+  { kind: 'OWL', body: '#9a8a70', dark: '#5a4e3e', verb: 'swoops at', names: ['HOOT', 'PROFESSOR', 'QUILLS'] },
+  { kind: 'SLIME', body: '#60d0a0', dark: '#2a8a60', verb: 'gloops', names: ['BLOOP', 'JIGGLES', 'GUS'] },
+  { kind: 'DRAKE', body: '#d05a4a', dark: '#8a2a2a', verb: 'singes', names: ['EMBER', 'CINDER', 'SNAPS'] },
+  { kind: 'FERRET', body: '#e8e0d0', dark: '#8a7a6a', verb: 'nips', names: ['NOODLE', 'SOCKS', 'ZIP'] },
+];
+
 function qNewParty() {
   const pick = list => list[Math.floor(rnd(0, list.length))];
-  const names = [pick(['ARUS', 'BRAM', 'DUKE', 'ROLF', 'KAI']), pick(['LYRA', 'FINN', 'SHAE', 'RIKO', 'PIP']), pick(['MIRA', 'ELLA', 'NOA', 'SAGE', 'ROSA']), pick(['ZOT', 'VEX', 'MOX', 'ORIN', 'TAZ'])];
-  q.names = names;
-  q.party = [
-    { name: 'ARUS', job: 'FIGHTER', hp: 34, max: 34, mp: 0, maxMp: 0, atk: 8, def: 4, hair: '#c83020', tunic: '#d8a030', gear: 'RUSTY SWORD' },
-    { name: 'LYRA', job: 'THIEF', hp: 26, max: 26, mp: 0, maxMp: 0, atk: 7, def: 3, hair: '#30a040', tunic: '#208050', gear: 'RUSTY KNIFE' },
-    { name: 'MIRA', job: 'W.MAGE', hp: 22, max: 22, mp: 12, maxMp: 12, atk: 3, def: 2, hair: '#f0f0f0', tunic: '#d84060', gear: 'OAK STAFF' },
-    { name: 'ZOT', job: 'B.MAGE', hp: 20, max: 20, mp: 12, maxMp: 12, atk: 3, def: 2, hair: '#f0c020', tunic: '#3848c0', gear: 'OAK ROD' },
-  ].map((h, i) => ({ ...h, name: names[i], lvl: 1, xp: 0, flash: 0, step: 0 }));
+  const roles = ['tank', 'rogue', 'heal', 'cast'];
+  q.party = roles.map(role => {
+    const job = pick(Q_JOBS[role]);
+    return { ...job, role, name: pick(Q_NAMES[role]), max: job.hp, mp: job.mp || 0, maxMp: job.mp || 0, lvl: 1, xp: 0, flash: 0, step: 0, gear: `RUSTY ${job.weapon}` };
+  });
+  q.names = q.party.map(h => h.name);
+  const pet = pick(Q_PETS);
+  q.pet = { ...pet, name: pick(pet.names) };
 }
 
 function qNewFloor() {
   q.floor++;
   const grid = Array.from({ length: QMAP }, () => new Uint8Array(QMAP).fill(1)), rooms = [];
-  for (let i = 0; i < 9; i++) {
-    const w = 4 + Math.floor(rnd(0, 5)), h = 3 + Math.floor(rnd(0, 4));
+  const carve = (x, y) => { if (y > 0 && x > 0 && y < QMAP - 1 && x < QMAP - 1) grid[y][x] = 0; };
+  for (let i = 0; i < 12; i++) {
+    const w = 5 + Math.floor(rnd(0, 7)), h = 4 + Math.floor(rnd(0, 5));
     const x = 2 + Math.floor(rnd(0, QMAP - w - 4)), y = 2 + Math.floor(rnd(0, QMAP - h - 4));
-    for (let b = y; b < y + h; b++) for (let a = x; a < x + w; a++) grid[b][a] = 0;
-    const prev = rooms[rooms.length - 1], cx = x + (w >> 1), cy = y + (h >> 1);
-    if (prev) {
-      for (let a = Math.min(prev.cx, cx); a <= Math.max(prev.cx, cx); a++) grid[prev.cy][a] = 0;
-      for (let b = Math.min(prev.cy, cy); b <= Math.max(prev.cy, cy); b++) grid[b][cx] = 0;
+    const shape = ['rect', 'round', 'cross', 'rect', 'pillared'][i % 5], cx = x + (w >> 1), cy = y + (h >> 1);
+    for (let b = y; b < y + h; b++) for (let a = x; a < x + w; a++) {
+      const round = ((a - cx + .5) / (w / 2)) ** 2 + ((b - cy + .5) / (h / 2)) ** 2 <= 1.05;
+      const cross = Math.abs(a - cx) <= 1 || Math.abs(b - cy) <= 1;
+      if (shape === 'round' ? round : shape === 'cross' ? cross : true) carve(a, b);
     }
-    rooms.push({ x, y, w, h, cx, cy });
+    const prev = rooms[rooms.length - 1];
+    if (prev) {
+      // Corridors are sometimes two tiles wide and turn at one corner.
+      const wide = i % 2;
+      for (let a = Math.min(prev.cx, cx); a <= Math.max(prev.cx, cx); a++) { carve(a, prev.cy); if (wide) carve(a, prev.cy + 1); }
+      for (let b = Math.min(prev.cy, cy); b <= Math.max(prev.cy, cy); b++) { carve(cx, b); if (wide) carve(cx + 1, b); }
+    }
+    rooms.push({ x, y, w, h, cx, cy, kind: ['hall', 'library', 'crypt', 'treasure', 'hall', 'garden'][i % 6] });
   }
   q.map = grid;
   q.x = rooms[0].cx; q.y = rooms[0].cy;
   const last = rooms[rooms.length - 1];
   q.stairs = [last.cx, last.cy];
-  q.chests = rooms.slice(1, -1).filter((_, i) => i % 2 === 0).map(r => ({ x: r.x + Math.floor(rnd(0, r.w)), y: r.y + Math.floor(rnd(0, r.h)), open: false }));
+  q.chests = rooms.slice(1, -1).filter((_, i) => i % 2 === 0).map(r => {
+    const spot = Array.from({ length: 16 }, () => [r.x + Math.floor(rnd(0, r.w)), r.y + Math.floor(rnd(0, r.h))]).find(([a, b]) => grid[b][a] === 0) || [r.cx, r.cy];
+    return { x: spot[0], y: spot[1], open: false };
+  });
   q.theme = Q_THEMES[(q.floor - 1) % Q_THEMES.length];
+  q.puzzle = qMakePuzzle(rooms);
   q.route = []; q.at = 0; q.step = 0; q.state = 'walk'; q.fade = 1; q.boss = q.floor % 5 === 0;
+  q.trail = Array.from({ length: 5 }, () => [q.x, q.y]);
+  qDecorate(rooms);
+  q.sparks.length = 0;
+  qBanner(q.boss ? `B${q.floor}F  ${q.theme.name}  BOSS FLOOR` : `B${q.floor}F  ${q.theme.name}`);
   qSay(`${q.theme.name} B${q.floor}F`);
+}
+
+const qBanner = text => { q.banner = { text, at: clock }; };
+
+// A sealed stairway needs a puzzle solved first: runes, levers or a push block.
+function qMakePuzzle(rooms) {
+  const grid = q.map;
+  const free = rooms.slice(1, -1).filter(r => {
+    for (let a = r.cx - 3; a <= r.cx + 3; a++) if (grid[r.cy]?.[a] !== 0 || q.chests.some(ch => ch.x === a && ch.y === r.cy)) return false;
+    return true;
+  });
+  if (!free.length) return null;
+  const r = free[Math.floor(rnd(0, free.length))], y = r.cy, cell = i => [r.cx - 3 + i, y];
+  const type = ['runes', 'levers', 'block'][Math.floor(rnd(0, 3))];
+  if (type === 'runes') {
+    const spots = [cell(0), cell(2), cell(4), cell(6)];
+    const order = [...spots].sort(() => Math.random() - .5), slip = Math.random() < .6;
+    const cols = ['#ff5a5a', '#5ad0ff', '#7dff5a', '#ffd24a'];
+    return { type, spots, cols, lit: [], steps: slip ? [order[0], order[2], ...order] : order, failAt: slip ? 1 : -1, i: 0, done: false, intro: 'Runes seal the stairs. Find the order.' };
+  }
+  if (type === 'levers') {
+    const spots = [cell(0), cell(3), cell(6)];
+    return { type, spots, pulled: [], steps: [...spots].sort(() => Math.random() - .5), failAt: -1, i: 0, done: false, intro: 'Three levers hold the seal shut.' };
+  }
+  return { type, spots: [cell(0), cell(1), cell(2), cell(3), cell(4), cell(5)], block: { x: r.cx - 2, y }, plate: { x: r.cx + 2, y }, steps: [cell(0), cell(1), cell(2), cell(3)], failAt: -1, i: 0, done: false, intro: 'A heavy block belongs on that plate.' };
+}
+
+function qPuzzleAct() {
+  const p = q.puzzle, here = p.steps[p.i], at = p.i;
+  p.i++; q.state = 'think'; q.wait = .9;
+  if (p.type === 'runes') {
+    if (at === p.failAt) {
+      p.lit = [];
+      for (const h of q.party) if (h.hp) h.hp = Math.max(1, h.hp - 3);
+      q.shake = .9;
+      qFx(here[0] * QTILE + 8, here[1] * QTILE + 8, 'hit', true);
+      qSay('Wrong rune! ZAP! -3 HP');
+      return;
+    }
+    p.lit.push(here.join());
+    qSay(`${q.party[0].name} steps on a rune. It glows.`);
+  } else if (p.type === 'levers') {
+    p.pulled.push(here.join());
+    qSay(`${q.party[0].name} pulls a lever. Clunk.`);
+  } else {
+    if (at) p.block.x = here[0] + 1;
+    q.wait = at ? .25 : .9;
+    if (!at) qSay(`${q.party[0].name} leans on the block.`);
+  }
+  if (p.i < p.steps.length) return;
+  p.done = true; q.wait = 1.4;
+  const reward = 30 * q.floor;
+  q.gold += reward;
+  qFx(q.x * QTILE + 8, q.y * QTILE + 4, 'gold', true);
+  qBanner('PUZZLE SOLVED!');
+  qSay(`The seal breaks! +${reward} GIL`);
+}
+
+// Pick decorations for a fresh floor. Solid ones only go where they can't block a path.
+function qDecorate(rooms) {
+  const grid = q.map, decor = q.decor = [], taken = new Set();
+  q.rugs = []; q.pools = [];
+  const key = (x, y) => x + y * QMAP, open = (x, y) => grid[y]?.[x] === 0;
+  q.chests.forEach(ch => taken.add(key(ch.x, ch.y)));
+  taken.add(key(q.x, q.y)); taken.add(key(...q.stairs));
+  q.puzzle?.spots.forEach(([a, b]) => taken.add(key(a, b)));
+  rooms.forEach(r => {
+    const wall = (kind, count) => {
+      for (let i = 0; i < count; i++) {
+        const x = r.x + 1 + i * 2, y = r.y;
+        if (open(x, y) && !open(x, y - 1) && !taken.has(key(x, y))) { decor.push({ x, y, kind, ph: rnd(0, 7) }); taken.add(key(x, y)); }
+      }
+    };
+    if (r.kind === 'library') { wall('shelf', 4); q.rugs.push({ x: r.cx - 1, y: r.cy - 1, w: 3, h: 2, col: '#27457a' }); }
+    if (r.kind === 'crypt') { wall('coffin', 3); }
+    if (r.kind === 'treasure') { wall('gold', 4); q.rugs.push({ x: r.cx - 1, y: r.cy - 1, w: 3, h: 2, col: '#7a1f2a' }); }
+    if (r.kind === 'garden' && r.w >= 5 && r.h >= 4 && open(r.cx, r.cy)) q.pools.push({ x: r.cx - 1, y: r.cy, w: 2, h: 1 });
+    if (r.kind === 'hall' && r.w >= 7 && r.h >= 5) q.rugs.push({ x: r.x + 2, y: r.cy, w: r.w - 4, h: 1, col: '#5a2a7a' });
+  });
+  for (const list of [q.rugs, q.pools]) for (const p of list) for (let b = p.y; b < p.y + p.h; b++) for (let a = p.x; a < p.x + p.w; a++) taken.add(key(a, b));
+  for (let y = 1; y < QMAP - 1; y++) for (let x = 1; x < QMAP - 1; x++) {
+    if (grid[y][x] && open(x, y + 1)) {
+      const roll = Math.random();
+      if (roll < .14) decor.push({ x, y, kind: 'torch', ph: rnd(0, 7) });
+      else if (roll < .2) decor.push({ x, y, kind: 'banner', ph: rnd(0, 7) });
+      else if (roll < .25) decor.push({ x, y, kind: 'crack', ph: 0 });
+      else if (roll < .29) decor.push({ x, y, kind: 'moss', ph: 0 });
+    }
+    if (!open(x, y) || taken.has(key(x, y))) continue;
+    const neighbours = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]].every(([a, b]) => open(x + a, y + b));
+    const roll = Math.random();
+    if (neighbours && roll < .035 && !taken.has(key(x, y))) {
+      grid[y][x] = 1; q.decor.push({ x, y, kind: Math.random() < .5 ? 'pillar' : 'statue', ph: 0, solid: true });
+      for (const [a, b] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) taken.add(key(x + a, y + b));
+    } else if (roll < .2) {
+      const kinds = q.theme.props;
+      decor.push({ x, y, kind: kinds[Math.floor(rnd(0, kinds.length))], ph: rnd(0, 7) });
+    }
+  }
+  q.critters = Array.from({ length: 7 }, (_, i) => {
+    const r = rooms[i % rooms.length];
+    return { x: r.cx, y: r.cy, fx: r.cx, fy: r.cy, tx: r.cx, ty: r.cy, q: 1, wait: rnd(0, 2), kind: i % 3 === 0 ? 'bat' : 'rat', ph: rnd(0, 7) };
+  });
+}
+
+function qFx(x, y, kind, world) {
+  const add = (n, make) => { for (let i = 0; i < n; i++) q.sparks.push({ x, y, world, life: 1, ...make(i) }); };
+  if (kind === 'fire') add(26, () => ({ x: x + rnd(-14, 14), y: y + rnd(-6, 16), vx: rnd(-8, 8), vy: rnd(-46, -14), col: ['#ffd24a', '#ff8a1e', '#e0301a'][Math.floor(rnd(0, 3))], size: 2 }));
+  else if (kind === 'cure') add(20, () => ({ x: x + rnd(-10, 10), y: y + rnd(0, 14), vx: rnd(-3, 3), vy: rnd(-34, -12), col: ['#b8ffb0', '#ffffff', '#6fe0ff'][Math.floor(rnd(0, 3))], size: 1 }));
+  else if (kind === 'slash') add(12, i => ({ x: x - 12 + i * 2.2, y: y + 14 - i * 2.2, vx: 0, vy: 0, col: '#ffffff', size: 2 }));
+  else if (kind === 'hit') add(10, () => ({ vx: rnd(-40, 40), vy: rnd(-40, 20), col: '#ff6a5a', size: 1 }));
+  else if (kind === 'gold') add(30, () => ({ x: x + rnd(-10, 10), vx: rnd(-34, 34), vy: rnd(-60, -18), col: ['#ffd24a', '#fff2a0', '#e0a020'][Math.floor(rnd(0, 3))], size: 1, grav: 110 }));
+  else if (kind === 'level') add(40, i => ({ x: x + Math.cos(i) * 12, y: y + 14, vx: Math.cos(i * 1.7) * 9, vy: rnd(-46, -18), col: i % 2 ? '#ffe08a' : '#ffffff', size: 1 }));
+  else if (kind === 'FIRE') add(26, () => ({ x: x + rnd(-14, 14), y: y + rnd(-6, 16), vx: rnd(-8, 8), vy: rnd(-46, -14), col: ['#ffd24a', '#ff8a1e', '#e0301a'][Math.floor(rnd(0, 3))], size: 2 }));
+  else if (kind === 'ICE') add(24, () => ({ x: x + rnd(-16, 16), y: y - 24 + rnd(-8, 8), vx: rnd(-6, 6), vy: rnd(24, 60), col: ['#ffffff', '#9fe0ff', '#4ab0f0'][Math.floor(rnd(0, 3))], size: 2 }));
+  else if (kind === 'BOLT') add(18, i => ({ x: x + Math.sin(i * 2.4) * 7, y: y - 34 + i * 3.4, vx: 0, vy: 0, col: i % 3 ? '#fff4a0' : '#ffffff', size: 2 }));
+  else if (kind === 'DRAIN') add(22, () => ({ x: x + rnd(-14, 14), y: y + rnd(-12, 12), vx: rnd(30, 80), vy: rnd(-16, 16), col: ['#b060e0', '#60e080', '#401860'][Math.floor(rnd(0, 3))], size: 2 }));
+  else if (kind === 'arrow') add(10, i => ({ x: x + 20 - i * 3.6, y: y - 2 + i * .4, vx: -60, vy: 0, col: '#e8d8b0', size: 1 }));
+  else if (kind === 'poof') add(22, () => ({ x: x + rnd(-12, 12), y: y + rnd(-12, 12), vx: rnd(-24, 24), vy: rnd(-30, 6), col: '#c8c8d8', size: 2 }));
+  if (q.sparks.length > 320) q.sparks.splice(0, q.sparks.length - 320);
 }
 
 function qPath(tx, ty) {
@@ -2203,12 +2540,15 @@ function qPath(tx, ty) {
 function qPlan() {
   const left = q.chests.filter(ch => !ch.open);
   const routes = left.map(ch => qPath(ch.x, ch.y)).filter(p => p.length).sort((a, b) => a.length - b.length);
-  q.route = routes[0] || qPath(...q.stairs);
+  const p = q.puzzle;
+  if (!routes[0] && p && !p.done && !p.told) { p.told = true; qSay(p.intro); }
+  q.route = routes[0] || (p && !p.done ? qPath(...p.steps[p.i]) : qPath(...q.stairs));
   q.at = 0;
 }
 
 function qLoot(chest) {
   chest.open = true; q.opened++;
+  qFx(chest.x * QTILE + 8, chest.y * QTILE + 6, 'gold', true);
   const roll = Math.random();
   if (roll < .4) {
     const coins = Math.floor(rnd(20, 60) * q.floor);
@@ -2219,10 +2559,11 @@ function qLoot(chest) {
     qSay('Found a POTION!');
   } else {
     const hero = q.party[Math.floor(rnd(0, 4))], tier = Q_GEAR[Math.min(Q_GEAR.length - 1, Math.floor((q.floor + 1) / 2))];
-    const armor = Math.random() < .4, kind = armor ? 'MAIL' : hero.job === 'FIGHTER' ? 'SWORD' : hero.job === 'THIEF' ? 'KNIFE' : 'STAFF';
+    const armor = Math.random() < .4, kind = armor ? 'MAIL' : hero.weapon;
     if (armor) hero.def += 2; else hero.atk += 2;
     if (!armor) hero.gear = `${tier} ${kind}`;
     qSay(`${hero.name} found ${tier} ${kind}!`);
+    qBanner(`${tier} ${kind}!`);
   }
 }
 
@@ -2237,7 +2578,8 @@ function qFight(boss) {
     ? [foe(Q_BOSSES[(q.floor / 5 - 1) % Q_BOSSES.length], true, 128, 70)]
     : Array.from({ length: count }, (_, i) => foe(pool[Math.floor(rnd(0, pool.length))], false, 122 + (i % 2) * 38, 52 + (i >> 1) * 42 + (i % 2) * 8));
   q.battle = { foes, queue: [], boss, pops: [], fire: 0 };
-  q.state = 'battle'; q.wait = .9; q.fade = 1;
+  q.state = 'battle'; q.wait = 1.1; q.swirl = 1; q.sparks.length = 0;
+  if (boss) { q.shake = 1; qBanner(`BOSS: ${foes[0].name}`); }
   qSay(boss ? `${foes[0].name} blocks the stairs!` : `${foes.length > 1 ? 'Monsters' : `A ${foes[0].name}`} appeared!`);
 }
 
@@ -2246,21 +2588,39 @@ function qPop(x, y, text, col) { q.battle.pops.push({ x, y, text, col, life: 1 }
 function qHeroAct(hero, foes) {
   const hurt = q.party.filter(h => h.hp > 0).sort((a, b) => a.hp / a.max - b.hp / b.max)[0];
   hero.step = 1;
-  if (hero.job === 'W.MAGE' && hero.mp >= 2 && hurt.hp < hurt.max * .55) {
+  if (hero.role === 'heal' && hero.mp >= 2 && hurt.hp < hurt.max * .55) {
     const heal = 14 + hero.lvl * 3;
     hurt.hp = Math.min(hurt.max, hurt.hp + heal); hero.mp -= 2;
-    qSay(`${hero.name} casts CURE on ${hurt.name}. +${heal}`);
+    qFx(212, 58 + q.party.indexOf(hurt) * 22, 'cure');
+    qPop(198, 60 + q.party.indexOf(hurt) * 22, `+${heal}`, '#a0ffa0');
+    qSay(`${hero.name} casts ${hero.spell} on ${hurt.name}. +${heal}`);
     return;
   }
   const target = foes[Math.floor(rnd(0, foes.length))];
-  const fire = hero.job === 'B.MAGE' && hero.mp >= 2;
-  let dmg = Math.max(1, Math.round((fire ? 12 + hero.lvl * 4 : hero.atk + hero.lvl * 1.5) * rnd(.85, 1.2)));
-  const crit = hero.job === 'THIEF' && Math.random() < .25;
+  const casting = hero.role === 'cast' && hero.mp >= 2;
+  let dmg = Math.max(1, Math.round((casting ? 12 + hero.lvl * 4 : hero.atk + hero.lvl * 1.5) * rnd(.85, 1.2)));
+  const crit = hero.role === 'rogue' && Math.random() < .25;
   if (crit) dmg *= 2;
-  if (fire) { hero.mp -= 2; q.battle.fire = 1; }
+  if (hero.job === 'MONK') dmg = Math.round(dmg * 1.3);
+  if (casting) { hero.mp -= 2; q.battle.fire = 1; q.battle.tint = Q_SPELLS[hero.spell]; }
+  const size = target.big ? 28 : 14;
+  qFx(target.x + size, target.y + size, casting ? hero.spell : hero.job === 'RANGER' || hero.job === 'NINJA' ? 'arrow' : 'slash');
+  if (crit || casting) q.shake = Math.max(q.shake, crit ? .9 : .5);
+  if (hero.spell === 'DRAIN' && casting) { hero.hp = Math.min(hero.max, hero.hp + Math.ceil(dmg / 3)); }
   target.hp -= dmg; target.flash = 1;
   qPop(target.x + 14, target.y, String(dmg), crit ? '#ffd24a' : '#fff');
-  qSay(`${hero.name} ${fire ? 'casts FIRE' : crit ? 'lands a critical' : 'attacks'}! ${target.name} -${dmg}`);
+  qSay(`${hero.name} ${casting ? `casts ${hero.spell}` : crit ? 'lands a critical' : 'attacks'}! ${target.name} -${dmg}`);
+  if (target.hp <= 0) { target.dead = true; qSay(`${target.name} is defeated!`); }
+}
+
+const Q_SPELLS = { FIRE: '255,120,30', ICE: '120,200,255', BOLT: '255,240,120', DRAIN: '150,60,200' };
+
+function qPetAct(foes) {
+  const target = foes[Math.floor(rnd(0, foes.length))], dmg = 3 + q.floor * 2;
+  target.hp -= dmg; target.flash = 1;
+  qFx(target.x + 14, target.y + 14, 'slash');
+  qPop(target.x + 14, target.y, String(dmg), '#ffc0e0');
+  qSay(`${q.pet.name} ${q.pet.verb} ${target.name}! -${dmg}`);
   if (target.hp <= 0) { target.dead = true; qSay(`${target.name} is defeated!`); }
 }
 
@@ -2268,6 +2628,8 @@ function qFoeAct(foe) {
   const alive = q.party.filter(h => h.hp > 0), hero = alive[Math.floor(rnd(0, alive.length))];
   const dmg = Math.max(1, Math.round((foe.atk - hero.def * .5) * rnd(.8, 1.2)));
   hero.hp = Math.max(0, hero.hp - dmg); hero.flash = 1;
+  qFx(212, 62 + q.party.indexOf(hero) * 22, 'hit');
+  q.shake = Math.max(q.shake, foe.big ? .9 : .35);
   qPop(202, 60 + q.party.indexOf(hero) * 22, String(dmg), '#ff9090');
   qSay(`${foe.name} hits ${hero.name}. -${dmg}`);
   if (!hero.hp) qSay(`${hero.name} has fallen!`);
@@ -2283,11 +2645,14 @@ function qWin() {
     h.xp += xp;
     while (h.xp >= h.lvl * h.lvl * 18 + 12) {
       h.xp -= h.lvl * h.lvl * 18 + 12; h.lvl++;
-      h.max += h.job === 'FIGHTER' ? 9 : 6; h.hp = h.max; h.atk += h.job.includes('MAGE') ? 1 : 2; h.def += 1;
+      h.max += h.role === 'tank' ? 9 : 6; h.hp = h.max; h.atk += h.maxMp ? 1 : 2; h.def += 1;
       if (h.maxMp) { h.maxMp += 3; h.mp = h.maxMp; }
       qSay(`${h.name} is now level ${h.lvl}!`);
+      qFx(212, 58 + q.party.indexOf(h) * 22, 'level');
+      qBanner(`${h.name} reached level ${h.lvl}!`);
     }
   }
+  qFx(150, 90, 'gold');
   const low = q.party.slice().sort((a, b) => a.hp / a.max - b.hp / b.max)[0];
   if (q.potions && low.hp < low.max * .5) { q.potions--; low.hp = Math.min(low.max, low.hp + 40); qSay(`${low.name} drinks a POTION.`); }
   if (boss) { q.boss = false; q.potions += 2; qSay('The way down is open! +2 POTIONS'); }
@@ -2308,8 +2673,11 @@ function questUpdate(dt) {
     if (!q.route.length) {
       // Already standing on the goal, as after a boss fight on the stairs.
       q.step = 0;
-      const chest = q.chests.find(ch => !ch.open && ch.x === q.x && ch.y === q.y);
-      if (chest) { qLoot(chest); q.state = 'pause'; q.wait = 1; } else qDescend();
+      const chest = q.chests.find(ch => !ch.open && ch.x === q.x && ch.y === q.y), p = q.puzzle;
+      if (chest) { qLoot(chest); q.state = 'pause'; q.wait = 1; }
+      else if (p && !p.done) {
+        if (q.x === p.steps[p.i][0] && q.y === p.steps[p.i][1]) qPuzzleAct(); else p.done = true;
+      } else qDescend();
       return;
     }
     const next = q.route[q.at];
@@ -2317,13 +2685,22 @@ function questUpdate(dt) {
     q.step += dt * 5.5;
     if (q.step < 1) return;
     q.step = 0; q.at++; q.steps++; q.flip = !q.flip;
+    q.trail.push([q.x, q.y]);
+    if (q.trail.length > 5) q.trail.shift();
     q.x = next[0]; q.y = next[1];
+    if (Math.random() < .012) {
+      const coins = 3 + Math.floor(rnd(0, 6)) * q.floor;
+      q.gold += coins;
+      qSay(`${q.pet.name} digs up ${coins} GIL!`);
+    }
     if (q.steps % 7 === 0) for (const h of q.party) if (h.hp) h.hp = Math.min(h.max, h.hp + 1);
     const chest = q.chests.find(ch => !ch.open && ch.x === q.x && ch.y === q.y);
     if (chest) { qLoot(chest); q.state = 'pause'; q.wait = 1; q.route = []; return; }
-    if (q.x === q.stairs[0] && q.y === q.stairs[1] && !q.chests.some(ch => !ch.open)) return qDescend();
-    if (q.steps > 7 && Math.random() < .07) { q.steps = 1; qFight(false); }
-  } else if (q.state === 'pause') {
+    const p = q.puzzle, solved = !p || p.done, loose = !q.chests.some(ch => !ch.open);
+    if (loose && !solved && q.x === p.steps[p.i][0] && q.y === p.steps[p.i][1]) { qPuzzleAct(); q.route = []; return; }
+    if (q.x === q.stairs[0] && q.y === q.stairs[1] && loose && solved) return qDescend();
+    if (q.steps > 22 && Math.random() < .03) { q.steps = 1; qFight(false); }
+  } else if (q.state === 'pause' || q.state === 'think') {
     q.wait -= dt;
     if (q.wait <= 0) q.state = 'walk';
   } else if (q.state === 'spoils') {
@@ -2338,6 +2715,7 @@ function questUpdate(dt) {
       qNewParty();
       qSay(`RUN ${q.run} begins. ${q.names[0]}'s party sets out.`);
       qNewFloor();
+      qBanner(`RUN ${q.run}  NEW PARTY`);
     }
   } else if (q.state === 'battle') {
     const b = q.battle;
@@ -2349,66 +2727,283 @@ function questUpdate(dt) {
     const foes = b.foes.filter(f => !f.dead), heroes = q.party.filter(h => h.hp > 0);
     if (!foes.length) return qWin();
     if (!heroes.length) { qSay('The party has fallen...'); q.state = 'wiped'; q.wait = 2.4; return; }
-    if (!b.queue.length) b.queue = [...heroes, ...foes].sort(() => Math.random() - .5);
+    if (!b.queue.length) b.queue = [...heroes, ...foes, ...(Math.random() < .35 ? [q.pet] : [])].sort(() => Math.random() - .5);
     const actor = b.queue.shift();
-    if (actor.job) { if (actor.hp > 0) qHeroAct(actor, foes); } else if (!actor.dead) qFoeAct(actor);
+    if (actor === q.pet) qPetAct(foes);
+    else if (actor.job) { if (actor.hp > 0) qHeroAct(actor, foes); } else if (!actor.dead) qFoeAct(actor);
     q.wait = .85;
   }
 }
 
 function qDrawHero(hero, x, y, alt) {
+  const px = Math.round(x), py = Math.round(y), hat = (col, a, b, w, h) => { qc.fillStyle = hero.hp ? col : '#606060'; qc.fillRect(px + a, py + b, w, h); };
+  qc.fillStyle = 'rgba(0,0,0,.35)'; qc.fillRect(px + 3, py + 11, 6, 2);
   const pal = { 1: hero.hp ? hero.hair : '#606060', 2: hero.hp ? '#f0c8a0' : '#909090', 3: hero.hp ? hero.tunic : '#505050', 4: '#201810' };
-  qc.drawImage(qSprite(`hero${alt ? 'b' : 'a'}`, alt ? Q_HERO_B : Q_HERO, pal), Math.round(x), Math.round(y));
+  qc.drawImage(qSprite(`hero${alt ? 'b' : 'a'}`, alt ? Q_HERO_B : Q_HERO, pal), px, py);
+  if (hero.hat === 'wizard') { hat(hero.tunic, 3, -1, 6, 2); hat(hero.tunic, 4, -3, 4, 2); hat(hero.tunic, 5, -5, 2, 2); hat('#f0d060', 3, 0, 6, 1); }
+  else if (hero.hat === 'helm') { hat('#d8e0f0', 3, -1, 6, 3); hat('#8a94a8', 3, 2, 6, 1); hat('#e04040', 5, -3, 2, 2); }
+  else if (hero.hat === 'hood') { hat(hero.tunic, 3, -1, 6, 3); hat(hero.tunic, 2, 1, 1, 4); hat(hero.tunic, 9, 1, 1, 4); }
+  else if (hero.hat === 'mitre') { hat('#f0f0f8', 4, -3, 4, 4); hat('#f0d060', 5, -2, 2, 1); }
+  else if (hero.hat === 'bandana') { hat('#e04040', 3, 0, 6, 2); hat('#e04040', 9, 1, 2, 1); }
+  else if (hero.hat === 'feather') { hat('#3a7a3a', 3, 0, 6, 2); hat('#f04040', 8, -3, 1, 3); }
+  else if (hero.hat === 'mask') { hat('#20202c', 3, 3, 6, 2); hat('#e04040', 9, 1, 2, 1); }
+  else if (hero.hat === 'topknot') { hat('#202028', 5, -2, 2, 2); }
+  else if (hero.hat === 'bald') { hat('#fff4e0', 4, 0, 2, 1); }
 }
 
-function qDrawMap() {
-  const px = (q.x + q.dx * q.step) * QTILE, py = (q.y + q.dy * q.step) * QTILE;
-  const camX = Math.round(px - QW / 2 + 8), camY = Math.round(py - QH / 2 + 8), wall = qTile(q.theme, true), floor = qTile(q.theme, false);
-  qc.fillStyle = '#000'; qc.fillRect(0, 0, QW, QH);
-  for (let y = Math.floor(camY / QTILE); y * QTILE < camY + QH; y++) for (let x = Math.floor(camX / QTILE); x * QTILE < camX + QW; x++) {
-    const solid = q.map[y]?.[x] ?? 1;
-    qc.drawImage(solid ? wall : floor, x * QTILE - camX, y * QTILE - camY);
+function qDrawPet(x, y, t, flip) {
+  const p = q.pet, px = Math.round(x), py = Math.round(y), dir = flip ? 1 : -1;
+  const r = (col, a, b, w, h) => { qc.fillStyle = col; qc.fillRect(px + (dir < 0 ? 12 - a - w : a), py + b, w, h); };
+  qc.fillStyle = 'rgba(0,0,0,.35)'; qc.fillRect(px + 2, py + 11, 8, 1);
+  const bob = Math.round(Math.abs(Math.sin(t * 6)));
+  if (p.kind === 'SLIME') { r(p.body, 2, 6 + bob, 8, 5 - bob); r(p.body, 3, 5 + bob, 6, 1); r('#fff', 4, 7 + bob, 1, 1); r('#fff', 7, 7 + bob, 1, 1); return; }
+  if (p.kind === 'OWL') {
+    const wing = Math.sin(t * 12) > 0 ? -1 : 0;
+    r(p.body, 4, 1 - bob, 5, 6); r(p.dark, 2, 3 + wing - bob, 2, 3); r(p.dark, 9, 3 + wing - bob, 2, 3);
+    r('#ffd24a', 5, 2 - bob, 1, 1); r('#ffd24a', 7, 2 - bob, 1, 1); r('#e08020', 6, 3 - bob, 1, 1); return;
   }
-  const [sx, sy] = q.stairs;
-  qc.fillStyle = '#000'; qc.fillRect(sx * QTILE - camX + 2, sy * QTILE - camY + 2, 12, 12);
-  qc.fillStyle = q.theme.hi;
-  for (let i = 0; i < 4; i++) qc.fillRect(sx * QTILE - camX + 3 + i, sy * QTILE - camY + 3 + i * 3, 10 - i * 2, 2);
+  r(p.body, 2, 6, 7, 3); r(p.body, 8, 3 - bob, 3, 4); r(p.dark, 2, 9, 1, 2); r(p.dark, 7, 9, 1, 2);
+  r('#201810', 10, 4 - bob, 1, 1); r(p.dark, 0, 5 + bob, 2, 1);
+  if (p.kind === 'CAT') { r(p.dark, 8, 2 - bob, 1, 1); r(p.dark, 10, 2 - bob, 1, 1); }
+  if (p.kind === 'DOG') r(p.dark, 8, 3 - bob, 1, 3);
+  if (p.kind === 'DRAKE') { r(p.dark, 4, 4 + bob, 3, 2); r('#ffd24a', 11, 5 - bob, 1, 1); }
+  if (p.kind === 'FERRET') r(p.dark, 9, 4 - bob, 2, 1);
+}
+
+function qMoveCritters(dt) {
+  for (const a of q.critters) {
+    a.q += dt * (a.kind === 'bat' ? 3 : 2);
+    if (a.q < 1) continue;
+    a.x = a.tx; a.y = a.ty;
+    a.wait -= dt;
+    if (a.wait > 0) continue;
+    const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(rnd(0, 4))];
+    if (q.map[a.y + dy]?.[a.x + dx] === 0) { a.tx = a.x + dx; a.ty = a.y + dy; a.q = 0; a.wait = rnd(.1, a.kind === 'bat' ? .4 : 1.6); }
+  }
+}
+
+function qDrawMotes(t) {
+  const m = q.theme.motes;
+  for (let i = 0; i < 36; i++) {
+    const seed = i * 41.7;
+    if (m === 'snow') { qc.fillStyle = '#e8f4ff'; qc.fillRect((seed + Math.sin(t + i) * 8 + t * 6) % QW, (i * 23 + t * 14) % QH, 1, 1); }
+    else if (m === 'ember') { qc.fillStyle = i % 2 ? '#ff8a1e' : '#ffd24a'; qc.fillRect((seed + Math.sin(t * 1.3 + i) * 10) % QW, QH - ((i * 29 + t * 16) % QH), 1, 1); }
+    else if (m === 'fly') { if (Math.sin(t * 1.4 + i) > .2) { qc.fillStyle = '#d8ff8a'; qc.fillRect((seed + Math.sin(t * .6 + i) * 16 + 16) % QW, (i * 31 + Math.cos(t * .5 + i) * 12 + 12) % QH, 1, 1); } }
+    else { qc.fillStyle = 'rgba(230,210,180,.45)'; qc.fillRect((seed + t * 2) % QW, (i * 19 + Math.sin(t * .4 + i) * 6 + 6) % QH, 1, 1); }
+  }
+}
+
+function qDrawSparks(dt, camX, camY) {
+  for (let i = q.sparks.length - 1; i >= 0; i--) {
+    const p = q.sparks[i];
+    p.life -= dt * 1.5;
+    if (p.life <= 0) { q.sparks.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.grav) p.vy += p.grav * dt;
+    qc.fillStyle = p.col;
+    qc.fillRect(Math.round(p.x - (p.world ? camX : 0)), Math.round(p.y - (p.world ? camY : 0)), p.size, p.size);
+  }
+}
+
+function qDrawMap(t, dt) {
+  const th = q.theme, px = (q.x + q.dx * q.step) * QTILE, py = (q.y + q.dy * q.step) * QTILE;
+  const camX = Math.round(px - QW / 2 + 8), camY = Math.round(py - QH / 2 + 8);
+  const tile = { face: qTile(th, 'face'), top: qTile(th, 'top'), floor: qTile(th, 'floor'), floor2: qTile(th, 'floor2') };
+  const solidAt = new Set(q.decor.filter(d => d.solid).map(d => d.x + d.y * QMAP));
+  const isWall = (x, y) => (q.map[y]?.[x] ?? 1) && !solidAt.has(x + y * QMAP);
+  const x0 = Math.floor(camX / QTILE), y0 = Math.floor(camY / QTILE), inView = (x, y) => x >= x0 - 1 && y >= y0 - 1 && x * QTILE < camX + QW + 16 && y * QTILE < camY + QH + 16;
+  qc.fillStyle = '#000'; qc.fillRect(0, 0, QW, QH);
+  for (let y = y0; y * QTILE < camY + QH; y++) for (let x = x0; x * QTILE < camX + QW; x++) {
+    const img = isWall(x, y) ? (isWall(x, y + 1) ? tile.top : tile.face) : (x * 7 + y * 13) % 5 ? tile.floor : tile.floor2;
+    qc.drawImage(img, x * QTILE - camX, y * QTILE - camY);
+    if (!isWall(x, y) && isWall(x, y - 1)) { qc.fillStyle = 'rgba(0,0,0,.32)'; qc.fillRect(x * QTILE - camX, y * QTILE - camY, QTILE, 5); qc.fillStyle = 'rgba(0,0,0,.16)'; qc.fillRect(x * QTILE - camX, y * QTILE - camY + 5, QTILE, 3); }
+  }
+  for (const r of q.rugs) {
+    qc.fillStyle = r.col; qc.fillRect(r.x * QTILE - camX, r.y * QTILE - camY, r.w * QTILE, r.h * QTILE);
+    qc.fillStyle = '#e8c860'; qc.fillRect(r.x * QTILE - camX + 2, r.y * QTILE - camY + 2, r.w * QTILE - 4, 1); qc.fillRect(r.x * QTILE - camX + 2, (r.y + r.h) * QTILE - camY - 3, r.w * QTILE - 4, 1);
+    qc.fillRect(r.x * QTILE - camX + 2, r.y * QTILE - camY + 2, 1, r.h * QTILE - 4); qc.fillRect((r.x + r.w) * QTILE - camX - 3, r.y * QTILE - camY + 2, 1, r.h * QTILE - 4);
+  }
+  for (const p of q.pools) {
+    const x = p.x * QTILE - camX, y = p.y * QTILE - camY, w = p.w * QTILE, h = p.h * QTILE;
+    qc.fillStyle = th.lo; qc.fillRect(x - 1, y - 1, w + 2, h + 2);
+    qc.fillStyle = th.water; qc.fillRect(x, y, w, h);
+    qc.fillStyle = 'rgba(255,255,255,.4)';
+    for (let i = 0; i < 6; i++) qc.fillRect(x + (i * 13 + t * 5) % (w - 6), y + 2 + (i * 7) % (h - 3), 5, 1);
+  }
+  const [sx, sy] = q.stairs, ux = sx * QTILE - camX, uy = sy * QTILE - camY, pz = q.puzzle;
+  qc.fillStyle = '#000'; qc.fillRect(ux + 1, uy + 1, 14, 14);
+  for (let i = 0; i < 5; i++) { qc.fillStyle = i % 2 ? th.mid : th.hi; qc.fillRect(ux + 2 + i, uy + 2 + i * 3, 12 - i * 2, 2); }
+  if (pz && !pz.done) {
+    qc.fillStyle = Math.sin(t * 5) > 0 ? '#ff3a3a' : '#c01a4a';
+    for (let i = 0; i < 4; i++) qc.fillRect(ux + 2 + i * 4, uy, 2, 16);
+    qc.fillRect(ux, uy + 7, 16, 2);
+  }
+  if (pz?.type === 'runes') pz.spots.forEach(([x, y], i) => {
+    const ax = x * QTILE - camX, ay = y * QTILE - camY, lit = pz.lit.includes(`${x},${y}`) || pz.done;
+    qc.fillStyle = '#16121e'; qc.fillRect(ax + 1, ay + 1, 14, 14);
+    qc.fillStyle = lit ? pz.cols[i] : '#5a5468';
+    qc.fillRect(ax + 7, ay + 3, 2, 10); qc.fillRect(ax + 4, ay + (i % 2 ? 5 : 9), 8, 2);
+    if (lit) { qc.fillRect(ax + 3, ay + 3, 2, 2); qc.fillRect(ax + 11, ay + 11, 2, 2); }
+  });
+  if (pz?.type === 'levers') pz.spots.forEach(([x, y]) => {
+    const ax = x * QTILE - camX, ay = y * QTILE - camY, on = pz.pulled.includes(`${x},${y}`) || pz.done;
+    qc.fillStyle = '#2a2a34'; qc.fillRect(ax + 4, ay + 10, 8, 4);
+    qc.fillStyle = '#a8a8b8'; qc.fillRect(on ? ax + 8 : ax + 6, ay + 3, 2, 8);
+    qc.fillStyle = on ? '#7dff5a' : '#ff5a5a'; qc.fillRect(on ? ax + 7 : ax + 5, ay + 1, 4, 3);
+  });
+  if (pz?.type === 'block') {
+    const bx = pz.block.x * QTILE - camX, by = pz.block.y * QTILE - camY, ax = pz.plate.x * QTILE - camX, ay = pz.plate.y * QTILE - camY;
+    qc.fillStyle = '#16121e'; qc.fillRect(ax + 1, ay + 1, 14, 14);
+    qc.fillStyle = pz.done ? '#7dff5a' : '#ffd24a'; qc.fillRect(ax + 3, ay + 3, 10, 10);
+    qc.fillStyle = '#16121e'; qc.fillRect(ax + 5, ay + 5, 6, 6);
+    qc.fillStyle = '#000'; qc.fillRect(bx + 1, by + 13, 14, 3);
+    qc.fillStyle = '#7a7a8a'; qc.fillRect(bx + 1, by + 1, 14, 13);
+    qc.fillStyle = '#a8a8b8'; qc.fillRect(bx + 2, by + 2, 12, 2);
+    qc.fillStyle = '#4a4a5a'; qc.fillRect(bx + 3, by + 6, 10, 1); qc.fillRect(bx + 7, by + 7, 1, 5);
+  }
+  for (const d of q.decor) if (inView(d.x, d.y)) qProp(d.kind, d.x * QTILE - camX, d.y * QTILE - camY, t, d.ph, th);
   for (const ch of q.chests) {
     const x = ch.x * QTILE - camX, y = ch.y * QTILE - camY;
+    qc.fillStyle = '#000'; qc.fillRect(x + 1, y + 13, 14, 2);
     qc.fillStyle = '#6a3a14'; qc.fillRect(x + 2, y + 4, 12, 10);
     qc.fillStyle = ch.open ? '#120a04' : '#b06a28'; qc.fillRect(x + 3, y + 5, 10, ch.open ? 4 : 3);
     qc.fillStyle = '#f0c840'; qc.fillRect(x + 7, y + 8, 2, 3);
+    if (!ch.open && Math.sin(t * 3 + ch.x) > .7) { qc.fillStyle = '#fff'; qc.fillRect(x + 12, y + 3, 1, 3); qc.fillRect(x + 11, y + 4, 3, 1); }
   }
-  qDrawHero(q.party[0], QW / 2 - 6, QH / 2 - 4, q.flip);
+  qMoveCritters(dt);
+  for (const a of q.critters) {
+    const k = Math.min(1, a.q), x = (a.x + (a.tx - a.x) * k) * QTILE - camX, y = (a.y + (a.ty - a.y) * k) * QTILE - camY;
+    if (a.kind === 'bat') {
+      const wing = Math.sin(t * 16 + a.ph) > 0 ? -1 : 1, hover = Math.sin(t * 4 + a.ph) * 3;
+      qc.fillStyle = '#1a1420'; qc.fillRect(x + 7, y + 4 + hover, 3, 2); qc.fillRect(x + 4, y + 4 + hover + wing, 3, 1); qc.fillRect(x + 10, y + 4 + hover + wing, 3, 1);
+    } else {
+      qc.fillStyle = '#6a6a72'; qc.fillRect(x + 5, y + 11, 5, 3); qc.fillRect(x + 10, y + 12, 2, 2);
+      qc.fillStyle = '#c88a8a'; qc.fillRect(x + 2, y + 12, 3, 1);
+    }
+  }
+  const path = [...q.trail, [q.x, q.y]], n = path.length - 1;
+  if (SHOW.pets) {
+    const a = path[n - 4], b = path[n - 3];
+    qDrawPet((a[0] + (b[0] - a[0]) * q.step) * QTILE - camX + 2, (a[1] + (b[1] - a[1]) * q.step) * QTILE - camY + 3, t, b[0] >= a[0]);
+  }
+  for (let i = 3; i >= 0; i--) {
+    const a = i ? path[n - i] : [q.x, q.y], b = i ? path[n - i + 1] : [q.x + q.dx, q.y + q.dy];
+    qDrawHero(q.party[i], (a[0] + (b[0] - a[0]) * q.step) * QTILE - camX + 2, (a[1] + (b[1] - a[1]) * q.step) * QTILE - camY + 2 - Math.abs(Math.sin(q.step * Math.PI)) * 2, i % 2 ? !q.flip : q.flip);
+  }
+  if (SHOW.effects) qDrawMotes(t);
+  if (!SHOW.lights) { if (SHOW.effects) qDrawSparks(dt, camX, camY); return; }
+
+  // Darkness with holes around the party and every light source.
+  qd.globalCompositeOperation = 'source-over'; qd.globalAlpha = 1;
+  qd.fillStyle = 'rgba(6,3,14,.8)'; qd.fillRect(0, 0, QW, QH);
+  qd.globalCompositeOperation = 'destination-out';
+  const hole = (x, y, r, a) => { qd.globalAlpha = a; qd.drawImage(qGlow, x - r, y - r, r * 2, r * 2); };
+  hole(QW / 2, QH / 2 + 4, 92 + Math.sin(t * 3) * 3, 1);
+  const lights = [];
+  for (const d of q.decor) {
+    const l = Q_LIGHTS[d.kind];
+    if (!l || !inView(d.x, d.y)) continue;
+    const x = d.x * QTILE - camX + 8, y = d.y * QTILE - camY + 6, r = l[0] + Math.sin(t * 7 + d.ph) * 3;
+    hole(x, y, r, .95); lights.push([x, y, r, l[1]]);
+  }
+  qc.drawImage(qDark, 0, 0);
+  qc.globalCompositeOperation = 'lighter';
+  for (const [x, y, r, col] of lights) {
+    qc.globalAlpha = .3;
+    qc.drawImage(qTint(col), x - r, y - r, r * 2, r * 2);
+  }
+  qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over';
+  if (SHOW.effects) qDrawSparks(dt, camX, camY);
 }
 
-function qDrawBattle(t) {
+function qDrawBattle(t, dt) {
   const b = q.battle, th = q.theme;
-  qc.fillStyle = '#000'; qc.fillRect(0, 0, QW, QH);
-  for (let x = 0; x < QW; x += 16) { qc.drawImage(qTile(th, true), x, 8); qc.drawImage(qTile(th, true), x, 24); }
-  qc.fillStyle = th.floor; qc.fillRect(0, 40, QW, 4);
+  const sky = qc.createLinearGradient(0, 0, 0, 62);
+  sky.addColorStop(0, th.sky[0]); sky.addColorStop(1, th.sky[1]);
+  qc.fillStyle = sky; qc.fillRect(0, 0, QW, 62);
+  const ground = qc.createLinearGradient(0, 62, 0, QH);
+  ground.addColorStop(0, th.mid); ground.addColorStop(.45, th.floor); ground.addColorStop(1, '#060408');
+  qc.fillStyle = ground; qc.fillRect(0, 62, QW, QH - 62);
+  qc.fillStyle = th.lo;
+  for (let x = 0; x < QW; x += 11) {
+    const h = 18 + (x * 17 % 23), w = 4 + x % 5;
+    qc.beginPath(); qc.moveTo(x - w, 0); qc.lineTo(x, h); qc.lineTo(x + w, 0); qc.fill();
+    const g = 8 + (x * 13 % 15);
+    qc.beginPath(); qc.moveTo(x - w, 63); qc.lineTo(x + 3, 63 - g); qc.lineTo(x + w + 3, 63); qc.fill();
+  }
+  qc.fillStyle = 'rgba(255,255,255,.05)';
+  for (let i = 0; i < 9; i++) qc.fillRect(0, 66 + i * i * 1.3, QW, 1);
   for (const f of b.foes) {
-    if (f.dead) continue;
+    if (f.dead) { if (!f.poofed) { f.poofed = true; qFx(f.x + (f.big ? 28 : 14), f.y + (f.big ? 28 : 14), 'poof'); } continue; }
     const scale = f.big ? 4 : 2, s = qSprite(`foe${f.name}`, f.rows, { 1: f.col, 2: '#fff', 0: '#101010', 3: '#401010' });
+    if (f.big) {
+      qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = .28 + Math.sin(t * 3) * .1;
+      qc.drawImage(qGlow, f.x - 30, f.y - 30, 116, 116);
+      qc.globalCompositeOperation = 'source-over'; qc.globalAlpha = 1;
+    }
+    qc.fillStyle = 'rgba(0,0,0,.4)'; qc.fillRect(f.x + 2, f.y + s.height * scale - 1, s.width * scale - 4, 3);
     if (f.flash > .4 && Math.floor(t * 30) % 2) continue;
-    qc.drawImage(s, f.x, f.y + Math.sin(t * 3 + f.x) * 1.5, s.width * scale, s.height * scale);
+    qc.drawImage(s, f.x + (f.flash > .1 ? Math.sin(t * 60) * 2 : 0), f.y + Math.sin(t * 3 + f.x) * 1.5, s.width * scale, s.height * scale);
   }
   q.party.forEach((h, i) => {
     if (h.flash > .3 && Math.floor(t * 30) % 2) return;
     qDrawHero(h, 206 - h.step * 14, 56 + i * 22, Math.floor(t * 3) % 2 === 0);
   });
-  if (b.fire) { qc.fillStyle = `rgba(255,120,30,${b.fire * .45})`; qc.fillRect(0, 44, 190, 136); }
-  for (const p of b.pops) p.life -= .02;
+  if (SHOW.pets) qDrawPet(222, 124, t, false);
+  if (b.fire && SHOW.effects) { qc.fillStyle = `rgba(${b.tint || '255,120,30'},${b.fire * .3})`; qc.fillRect(0, 0, QW, QH); }
+  for (const p of b.pops) p.life -= dt * 1.2;
   b.pops = b.pops.filter(p => p.life > 0);
+  if (SHOW.effects) { qDrawMotes(t); qDrawSparks(dt, 0, 0); }
+}
+
+// The tiny bald streamer: headphones, boom mic and a face that follows the run.
+function qDrawStreamer(t) {
+  const x = 6, y = QH - 58, cx = x + 26, r = (col, a, b, w, h) => { qc.fillStyle = col; qc.fillRect(x + a, y + b, w, h); };
+  const low = q.party.some(h => h.hp && h.hp < h.max * .3), boss = q.battle?.boss, wiped = q.state === 'wiped';
+  const happy = q.state === 'spoils' || q.state === 'pause' || q.puzzle?.done && q.state === 'think', talking = t - q.saysAt < 3.2;
+  const bob = Math.round(Math.sin(t * (boss ? 7 : 2.4))), lean = Math.round(Math.sin(t * .6));
+  r('#e23bff', -1, -1, 54, 54); r('#5af0ff', 0, 0, 52, 52);
+  r('#14102a', 1, 1, 50, 50); r('#241a48', 1, 1, 50, 30);
+  r('#2c2060', 5, 6, 12, 6); r('#ff4a8a', 7, 8, 3, 3); r('#4ac8ff', 12, 8, 3, 3);
+  r('#ff4a8a', 36, 7, 11, 1); r('#ff4a8a', 36, 11, 11, 1); r('#ff4a8a', 36, 7, 1, 5); r('#ff4a8a', 46, 7, 1, 5);
+  const hx = lean, hy = bob;
+  r('#3a2a7a', 11 + hx, 39, 30, 12); r('#2a1e5e', 18 + hx, 39, 16, 4);
+  r('#d8ac88', 22 + hx, 34 + hy, 8, 6);
+  r('#ecc4a2', 15 + hx, 13 + hy, 22, 22); r('#ecc4a2', 17 + hx, 11 + hy, 18, 2); r('#ecc4a2', 17 + hx, 35 + hy, 18, 1);
+  r('#fff4e0', 20 + hx, 14 + hy, 6, 2); r('#fff4e0', 21 + hx, 16 + hy, 2, 1);
+  r('#14141c', 15 + hx, 9 + hy, 22, 2); r('#14141c', 13 + hx, 11 + hy, 2, 6); r('#14141c', 37 + hx, 11 + hy, 2, 6);
+  r('#e0302a', 11 + hx, 17 + hy, 5, 11); r('#e0302a', 36 + hx, 17 + hy, 5, 11); r('#ff8a7a', 12 + hx, 19 + hy, 2, 4);
+  r('#14141c', 40 + hx, 27 + hy, 1, 5); r('#14141c', 32 + hx, 31 + hy, 9, 1); r('#14141c', 30 + hx, 30 + hy, 3, 3);
+  const wide = boss || low, blink = Math.sin(t * 1.3) > .985, look = Math.round(Math.sin(t * .8) * 1);
+  for (const ex of [19, 28]) {
+    if (blink) { r('#14141c', ex + hx, 22 + hy, 4, 1); continue; }
+    r('#fff', ex + hx, (wide ? 19 : 20) + hy, 4, wide ? 5 : 4);
+    r('#14141c', ex + 1 + look + hx, 21 + hy, 2, 2);
+  }
+  r('#5a3a28', 18 + hx, (wide ? 17 : 18) + hy, 6, 1); r('#5a3a28', 28 + hx, (wide ? 17 : 18) + hy, 6, 1);
+  if (wiped) { r('#14141c', 22 + hx, 30 + hy, 8, 1); r('#14141c', 21 + hx, 31 + hy, 1, 1); r('#14141c', 30 + hx, 31 + hy, 1, 1); }
+  else if (boss || (talking && Math.sin(t * 16) > 0)) { r('#5a1a1a', 23 + hx, 28 + hy, 6, 4); }
+  else if (happy) { r('#14141c', 21 + hx, 28 + hy, 1, 1); r('#14141c', 22 + hx, 29 + hy, 8, 1); r('#14141c', 30 + hx, 28 + hy, 1, 1); }
+  else r('#14141c', 23 + hx, 29 + hy, 6, 1);
+  if (low && Math.sin(t * 2) > 0) { r('#7ac8ff', 37 + hx, 13 + hy, 2, 4); }
+  if (happy) { r('#ecc4a2', 6, 30 + bob, 5, 11); r('#ecc4a2', 41, 30 - bob, 5, 11); }
 }
 
 function drawQuest(t, dt) {
   questUpdate(dt);
-  if (q.battle) qDrawBattle(t); else qDrawMap();
+  if (q.battle) qDrawBattle(t, dt); else qDrawMap(t, dt);
+  if (SHOW.streamer) qDrawStreamer(t);
+  if (t > q.nextSay) {
+    const vars = questChatVars();
+    q.says = chatExpand('streamer').replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? key).replace(/ {2,}/g, ' ').trim();
+    q.saysAt = t; q.nextSay = t + rnd(8, 14);
+  }
   const s = Math.min(W / QW, H / QH), ox = (W - QW * s) / 2, oy = (H - QH * s) / 2;
   c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+  q.shake = Math.max(0, q.shake - dt * 2.4);
+  const jolt = SHOW.effects ? q.shake * 5 * s * .4 : 0;
   c.imageSmoothingEnabled = false;
-  c.drawImage(qLow, ox, oy, QW * s, QH * s);
+  c.drawImage(qLow, ox + rnd(-jolt, jolt), oy + rnd(-jolt, jolt), QW * s, QH * s);
   c.imageSmoothingEnabled = true;
   const P = v => v * s;
   const win = (x, y, w, h) => {
@@ -2419,25 +3014,76 @@ function drawQuest(t, dt) {
     c.fillStyle = col; c.textAlign = 'left'; c.font = `${P(size)}px VT323, monospace`;
     c.fillText(str, ox + P(x), oy + P(y));
   };
-  win(4, 4, 112, 48);
-  q.party.forEach((h, i) => {
-    const y = 13 + i * 11;
-    text(h.name, 9, y, 9, h.hp ? '#fff' : '#ff8080');
-    text(`L${h.lvl}`, 36, y, 9, '#c8d8ff');
-    text(`${h.hp}/${h.max}`, 54, y, 9, h.hp < h.max * .3 ? '#ffb040' : '#fff');
-    if (h.maxMp) text(`MP${h.mp}`, 92, y, 8, '#9fd8ff');
-  });
-  win(4, 56, 112, 26);
-  text(`${q.theme.name} B${q.floor}F`, 9, 65);
-  text(`GIL ${q.gold}  POTION ${q.potions}`, 9, 76, 8, '#ffe08a');
-  win(4, 86, 112, 15);
-  text(`RUN ${q.run}   BEST B${Math.max(q.best, q.floor)}F`, 9, 96, 8, '#c8d8ff');
-  win(4, QH - 40, 200, 36);
-  q.log.forEach((line, i) => text(line, 9, QH - 29 + i * 11));
+  if (q.battle) {
+    if (SHOW.stats) {
+      win(4, 4, 112, 48);
+      q.party.forEach((h, i) => {
+        const y = 13 + i * 11;
+        text(h.name, 9, y, 9, h.hp ? '#fff' : '#ff8080');
+        text(`L${h.lvl}`, 36, y, 9, '#c8d8ff');
+        text(`${h.hp}/${h.max}`, 54, y, 9, h.hp < h.max * .3 ? '#ffb040' : '#fff');
+        if (h.maxMp) text(`MP${h.mp}`, 92, y, 8, '#9fd8ff');
+      });
+      win(4, 56, 112, 15);
+      text(`RUN ${q.run}  B${q.floor}F  GIL ${q.gold}`, 9, 66, 8, '#ffe08a');
+    }
+    if (SHOW.log) {
+      win(62, QH - 40, 174, 36);
+      q.log.forEach((line, i) => text(line, 67, QH - 29 + i * 11));
+    }
+  } else {
+    // A slim strip outside combat so the dungeon stays visible.
+    if (SHOW.stats) {
+      win(4, 4, 138, 19);
+      text(`B${q.floor}F ${q.theme.name}`, 8, 11, 7);
+      text(`RUN ${q.run} BEST ${Math.max(q.best, q.floor)} GIL ${q.gold}`, 8, 18.5, 6.5, '#ffe08a');
+      q.party.forEach((h, i) => {
+        const bx = 72 + (i % 2) * 34, by = 7 + (i >> 1) * 7, fill = clamp(h.hp / h.max);
+        c.fillStyle = '#0a1450'; c.fillRect(ox + P(bx), oy + P(by), P(30), P(4));
+        c.fillStyle = fill < .3 ? '#ff5a4a' : '#7dff5a'; c.fillRect(ox + P(bx), oy + P(by), P(30 * fill), P(4));
+      });
+    }
+    if (SHOW.log) {
+      win(62, QH - 16, 174, 12);
+      text(q.log[q.log.length - 1] || '', 66, QH - 7, 7.5);
+    }
+  }
+  if (SHOW.streamer && t - q.saysAt < 4.5) {
+    const y0 = q.battle ? QH - 56 : QH - 32;
+    win(62, y0, 150, 13);
+    c.fillStyle = '#fff'; c.font = `${P(7.5)}px VT323, monospace`; c.textAlign = 'left';
+    c.fillText(q.says, ox + P(66), oy + P(y0 + 9));
+  }
+  if (SHOW.streamer) {
+    c.fillStyle = '#fff'; c.textAlign = 'left'; c.font = `${P(5.5)}px VT323, monospace`;
+    c.fillText('CHROMEDOME_LIVE', ox + P(8), oy + P(QH - 3.5));
+  }
+  if (q.state === 'think') {
+    c.fillStyle = '#fff'; c.fillRect(ox + P(QW / 2 - 4), oy + P(QH / 2 - 26), P(10), P(11));
+    text(q.puzzle?.done ? '!' : '?', QW / 2 - 2, QH / 2 - 17, 11, '#1830a8');
+  }
   if (q.battle) for (const p of q.battle.pops) text(p.text, p.x, p.y - (1 - p.life) * 16, 11, p.col);
+  if (SHOW.banners && q.banner && t - q.banner.at < 2.6) {
+    const age = t - q.banner.at, slide = Math.min(1, age * 3) * Math.min(1, (2.6 - age) * 3), w = 92, x = 148;
+    c.globalAlpha = clamp(slide);
+    win(x, 4 + slide * 2, w, 13);
+    c.textAlign = 'center'; c.fillStyle = '#ffe08a'; c.font = `${P(7.5)}px VT323, monospace`;
+    c.fillText(q.banner.text, ox + P(x + w / 2), oy + P(13 + slide * 2));
+    c.globalAlpha = 1;
+  }
   if (q.fade) { c.fillStyle = `rgba(0,0,0,${q.fade})`; c.fillRect(0, 0, W, H); }
+  q.swirl = Math.max(0, q.swirl - dt * 1.5);
+  if (q.swirl) {
+    // The old battle swirl: black wedges closing around the screen centre.
+    c.fillStyle = '#000';
+    const wedges = 14, r = Math.hypot(W, H), turn = (1 - q.swirl) * 3;
+    for (let i = 0; i < wedges; i++) {
+      const a = i / wedges * Math.PI * 2 + turn, size = Math.PI * 2 / wedges * q.swirl;
+      c.beginPath(); c.moveTo(W / 2, H / 2); c.arc(W / 2, H / 2, r, a, a + size); c.closePath(); c.fill();
+    }
+  }
   const mood = q.state === 'battle' ? (q.battle.boss ? 'boss' : 'fight') : q.state;
-  chatTick(t, Q_CHAT[mood], mood === 'walk' ? 1.3 : .6, questChatVars());
+  chatTick(t, Q_CHAT[mood], mood === 'walk' ? 1.3 : .6, { ...questChatVars(), rule: mood });
   drawChatPanel(.54);
   drawChatAlert(t);
 }
@@ -2723,6 +3369,19 @@ const pickScene = i => { setShuffle(''); setScene(i, performance.now() / 1000); 
 const nextClassic = () => { setShuffle(''); classic + 1 < CLASSICS.length ? setClassic(classic + 1) : setScene(sceneIx, performance.now() / 1000); };
 const toggleShuffle = mode => setShuffle(shuffleMode === mode ? '' : mode);
 document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => toggleShuffle(b.dataset.mode); });
+Object.entries(SHOW_LABELS).forEach(([key, label]) => {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.dataset.show = key;
+  const sync = () => {
+    b.classList.toggle('on', SHOW[key]);
+    b.setAttribute('aria-pressed', SHOW[key]);
+    if (key === 'scan') document.body.classList.toggle('no-scan', !SHOW.scan);
+  };
+  b.onclick = () => { SHOW[key] = !SHOW[key]; store.set('winvamp.show', JSON.stringify(SHOW)); sync(); };
+  sync();
+  $('toggles').append(b);
+});
 $('srcTab').onclick = () => useTab(false);
 $('srcOther').onclick = () => useTab(true);
 CLASSICS.forEach(([name, , group], i) => {
@@ -2806,7 +3465,7 @@ api.onerror = () => note('Could not reach YouTube. Check the internet connection
 document.head.append(api);
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
-window.ghoulamp = { audio: A, yt, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatPools: { Q_CHAT, CHAT_ANY, CHAT_CALM, CHAT_PANIC, CHAT_DEAD, CHAT_REPLIES, CHATTERS }, questChatVars };
+window.ghoulamp = { audio: A, yt, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW };
 </script>
 </body>
 </html>
