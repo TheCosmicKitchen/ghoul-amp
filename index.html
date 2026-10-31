@@ -21,6 +21,11 @@
   #main.shade > :not(.bar) { display: none; }
   body.classic #stage, body.stark #stage, body.stream #stage { filter: none; }
   #picker, .vis-row { gap: 2px; }
+  #chill { flex-wrap: wrap; }
+  #chill button { flex: 1 1 23%; }
+  #list[data-frame=chill] { background: #e8dcc6; border-color: #fff4e0; border-radius: 10px; box-shadow: 0 6px 22px rgba(0,0,0,.45); }
+  #list[data-frame=chill] .bar { background: #e8dcc6; color: #6a5238; letter-spacing: 2px; }
+  #list[data-frame=chill] .bar span { background: none; }
   .vis-row button { flex: 1; min-width: 0; padding: 3px 0; font-size: 16px; }
   #tabStatus { flex: none; min-width: 112px; padding: 0 4px; text-align: center; color: var(--dim); }
   #tabStatus.good { color: var(--led); }
@@ -192,6 +197,8 @@
   <div class="row" id="picker" role="group" aria-label="Choose a scene"></div>
   <div class="row"><label>WINAMP CLASSIC</label></div>
   <div class="row vis-row" id="classics" role="group" aria-label="Winamp classic visualizers"></div>
+  <div class="row"><label>CHILL</label><span class="spacer"></span><button id="shuffleChill" data-mode="chill" title="Slowly rotates the chill set">CHILL ROTATE</button></div>
+  <div class="row vis-row" id="chill" role="group" aria-label="Chill scenes"></div>
   <div class="row"><label>WINDOWS MEDIA PLAYER 9</label></div>
   <div class="row vis-row" id="wmp9" role="group" aria-label="Windows Media Player 9 visualizers"></div>
   <div class="row"><label>WINDOWS XP</label></div>
@@ -1792,14 +1799,212 @@ function drawDots(t) {
   }
 }
 
+/* Chill scenes for everyday listening: slow, warm, nothing spooky */
+function drawSunset(t) {
+  const sky = c.createLinearGradient(0, 0, 0, H * .62);
+  sky.addColorStop(0, '#3b2a6b'); sky.addColorStop(.5, '#c9567a'); sky.addColorStop(1, '#ffb066');
+  c.fillStyle = sky; c.fillRect(0, 0, W, H);
+  const sx = W * .5, sy = H * .56 + Math.sin(t * .08) * 6 * U, sr = (88 + A.bass * 8) * U;
+  halo(sx, sy, sr * 4, 'rgba(255,190,120,.8)', .55);
+  disc(sx, sy, sr, '#ffe2a0');
+  for (let i = 0; i < 5; i++) {
+    c.globalAlpha = .28;
+    oval(((i * .29 + t * .004) % 1.4 - .2) * W, H * (.14 + i * .075), 250 * U, 15 * U, '#ffd2c0');
+  }
+  c.globalAlpha = 1;
+  const sea = c.createLinearGradient(0, H * .62, 0, H);
+  sea.addColorStop(0, '#d66a6a'); sea.addColorStop(.4, '#5a3f86'); sea.addColorStop(1, '#1f2a55');
+  c.fillStyle = sea; c.fillRect(0, H * .62, W, H);
+  for (let i = 0; i < 26; i++) {
+    const y = H * (.63 + i * .0145), w = (50 + i * 11) * (1 + Math.sin(t * .9 + i * 1.7) * .3) * U;
+    c.fillStyle = `rgba(255,214,150,${.5 - i * .015})`;
+    c.fillRect(sx - w / 2 + Math.sin(t * .6 + i) * 8 * U, y, w, 3 * U);
+  }
+  const f = '#1a1230', bx = W * .1, by = H, tx = W * .17, ty = H * .4;
+  c.strokeStyle = f; c.lineWidth = 16 * U; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(W * .1, H * .65, tx, ty); c.stroke();
+  c.lineWidth = 7 * U;
+  for (let i = 0; i < 7; i++) {
+    const a = -2.9 + i * .78 + Math.sin(t * .6 + i) * .05, l = 180 * U;
+    c.beginPath(); c.moveTo(tx, ty); c.quadraticCurveTo(tx + Math.cos(a) * l * .6, ty + Math.sin(a) * l * .6 - 30 * U, tx + Math.cos(a) * l, ty + Math.sin(a) * l + 46 * U); c.stroke();
+  }
+  c.lineCap = 'butt';
+}
+
+function drawAurora(t) {
+  const sky = c.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#040a1c'); sky.addColorStop(1, '#0c2a3a');
+  c.fillStyle = sky; c.fillRect(0, 0, W, H);
+  for (const s of stars) { c.globalAlpha = .3 + .5 * Math.abs(Math.sin(t * .4 + s.ph)); disc(s.x * W, s.y * H, s.r * U, '#dfeaf5'); }
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'lighter';
+  [['60,255,170', 0], ['120,120,255', 2.1], ['255,90,190', 4.3]].forEach(([rgb, ph], k) => {
+    for (let i = 0; i < 90; i++) {
+      const x = i / 90 * W, top = H * (.2 + k * .05 + Math.sin(i * .07 + t * .22 + ph) * .1), h = H * (.3 + Math.sin(i * .13 - t * .17 + ph) * .1);
+      const glow = c.createLinearGradient(0, top, 0, top + h), a = (.38 + A.mid * .16) * (.6 + Math.sin(i * .21 + t * .5 + ph) * .4);
+      glow.addColorStop(0, `rgba(${rgb},0)`); glow.addColorStop(.75, `rgba(${rgb},${a})`); glow.addColorStop(1, `rgba(${rgb},0)`);
+      c.fillStyle = glow; c.fillRect(x, top, W / 90 + 1, h);
+    }
+  });
+  c.globalCompositeOperation = 'source-over';
+  c.fillStyle = '#050a14';
+  c.beginPath(); c.moveTo(0, H); c.lineTo(0, H * .8);
+  for (let x = 0; x <= W + 30; x += 30) c.lineTo(x, H * .8 - Math.abs(Math.sin(x * .004)) * 120 * U - Math.sin(x * .019) * 22 * U);
+  c.lineTo(W, H); c.closePath(); c.fill();
+}
+
+function drawHearth(t) {
+  c.fillStyle = '#1c110c'; c.fillRect(0, 0, W, H);
+  c.fillStyle = '#2b1a12';
+  for (let y = 0, r = 0; y < H; y += 44 * U, r++) for (let x = r % 2 ? -46 * U : 0; x < W; x += 92 * U) c.fillRect(x + 2, y + 2, 88 * U, 40 * U);
+  const cx = W / 2, floor = H * .84, pw = 340 * U, ph = 390 * U;
+  c.fillStyle = '#5a4a3e'; c.fillRect(cx - pw - 34 * U, floor - ph - 34 * U, pw * 2 + 68 * U, ph + 34 * U);
+  c.fillStyle = '#6e5a4a'; c.fillRect(cx - pw - 60 * U, floor - ph - 58 * U, pw * 2 + 120 * U, 30 * U);
+  c.fillStyle = '#0c0705'; c.fillRect(cx - pw, floor - ph, pw * 2, ph);
+  halo(cx, floor - 90 * U, 460 * U, 'rgba(255,130,40,.8)', .5 + Math.sin(t * 3) * .05 + A.bass * .15);
+  for (let i = -8; i <= 8; i++) {
+    const fx = cx + i * 32 * U, fh = (130 + (8 - Math.abs(i)) * 20 + Math.sin(t * 2.4 + i * 1.3) * 34 + Math.sin(t * 5.1 + i) * 16 + A.bars[(i + 8) * 3] * 60) * U;
+    c.fillStyle = i % 3 === 0 ? '#ffd166' : i % 2 ? '#ff7f2a' : '#e24c16';
+    c.beginPath(); c.moveTo(fx - 40 * U, floor - 30 * U); c.quadraticCurveTo(fx + Math.sin(t * 1.8 + i) * 22 * U, floor - fh * 1.5, fx + 40 * U, floor - 30 * U); c.fill();
+  }
+  c.strokeStyle = '#3a2316'; c.lineWidth = 34 * U; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(cx - 170 * U, floor - 20 * U); c.lineTo(cx + 150 * U, floor - 44 * U); c.moveTo(cx + 170 * U, floor - 20 * U); c.lineTo(cx - 150 * U, floor - 44 * U); c.stroke();
+  c.lineCap = 'butt';
+  c.fillStyle = '#20140e'; c.fillRect(0, floor, W, H - floor);
+  halo(cx, floor + 20 * U, 520 * U, 'rgba(255,120,40,.5)', .28);
+}
+
+function drawRain(t) {
+  const sky = c.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#141a33'); sky.addColorStop(1, '#2a2440');
+  c.fillStyle = sky; c.fillRect(0, 0, W, H);
+  const cols = ['rgba(255,170,90,.75)', 'rgba(255,110,150,.7)', 'rgba(110,190,255,.7)', 'rgba(255,220,130,.7)', 'rgba(170,130,255,.7)'];
+  for (let i = 0; i < 34; i++) {
+    const x = ((i * .317 + Math.sin(i) * .1) % 1) * W + Math.sin(t * .1 + i) * 10 * U, y = H * (.35 + ((i * .61) % 1) * .55);
+    const r = (28 + (i % 5) * 16) * U * (1 + A.bars[i % BARS] * .25);
+    c.globalAlpha = .62 + Math.sin(t * .4 + i * 2) * .2;
+    c.drawImage(glow(cols[i % cols.length]), x - r, y - r, r * 2, r * 2);
+  }
+  c.globalAlpha = 1;
+  c.strokeStyle = 'rgba(205,220,255,.32)'; c.lineWidth = 1.5 * U;
+  for (let i = 0; i < 110; i++) {
+    const speed = .14 + (i % 7) * .025, x = (i * .137) % 1 * W + Math.sin(i * 2 + t * .3) * 6 * U, y = ((t * speed + i * .173) % 1.1) * H, l = (14 + (i % 5) * 7) * U;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x + 1.5 * U, y + l); c.stroke();
+    if (i % 4 === 0) disc(x + 1.5 * U, y + l, 2.3 * U, 'rgba(225,235,255,.55)');
+  }
+  c.fillStyle = '#120e1c';
+  c.fillRect(0, 0, W, 24 * U); c.fillRect(0, H - 34 * U, W, 34 * U); c.fillRect(0, 0, 24 * U, H); c.fillRect(W - 24 * U, 0, 24 * U, H);
+  c.fillRect(W / 2 - 8 * U, 0, 16 * U, H); c.fillRect(0, H * .42, W, 12 * U);
+}
+
+const LAVA_BLOBS = Array.from({ length: 7 }, (_, i) => ({ x: .12 + i * .13, sp: .05 + i * .012, ph: i * 1.7, r: 70 + (i % 3) * 45 }));
+function drawLava(t) {
+  const d = plasmaImg.data, grow = 1 + A.bass * .12;
+  const blobs = LAVA_BLOBS.map(b => [b.x * 160 + Math.sin(t * .13 + b.ph) * 14, 45 + Math.sin(t * b.sp + b.ph) * 52, b.r * grow]);
+  for (let y = 0, o = 0; y < 90; y++) for (let x = 0; x < 160; x++, o += 4) {
+    let v = 0;
+    for (const [bx, by, br] of blobs) v += br / ((x - bx) ** 2 + (y - by) ** 2 + 1);
+    const p = clamp((v - .9) / 1.1), edge = clamp((v - .62) / .2), bg = y / 90;
+    d[o] = 26 + bg * 34 + edge * (205 - bg * 34); d[o + 1] = 8 + edge * (30 + p * 150); d[o + 2] = 60 + bg * 34 + edge * (20 - p * 70); d[o + 3] = 255;
+  }
+  plasmaCtx.putImageData(plasmaImg, 0, 0);
+  c.imageSmoothingEnabled = true;
+  c.drawImage(plasma, 0, 0, W, H);
+}
+
+const PADS = Array.from({ length: 9 }, (_, i) => ({ x: (i * .37 + .08) % 1, y: (i * .61 + .1) % 1, r: 40 + (i % 3) * 18, flower: i % 3 === 0 }));
+function drawKoi(t) {
+  const pond = c.createRadialGradient(W / 2, H / 2, 40 * U, W / 2, H / 2, Math.hypot(W, H) * .6);
+  pond.addColorStop(0, '#1f8a8f'); pond.addColorStop(1, '#0b3d4f');
+  c.fillStyle = pond; c.fillRect(0, 0, W, H);
+  c.strokeStyle = 'rgba(190,240,235,.14)'; c.lineWidth = 2 * U;
+  for (let i = 0; i < 5; i++) {
+    const q = (t * .07 + i * .2) % 1, x = W * ((i * .43 + .2) % 1), y = H * ((i * .71 + .25) % 1);
+    c.globalAlpha = 1 - q;
+    c.beginPath(); c.ellipse(x, y, q * 240 * U, q * 150 * U, 0, 0, 7); c.stroke();
+  }
+  c.globalAlpha = 1;
+  [['#f26b21', '#fff0dc'], ['#fff0dc', '#f26b21'], ['#e8a13a', '#3a2a22'], ['#fff0dc', '#e23b2e'], ['#f26b21', '#3a2a22']].forEach(([body, spot], k) => {
+    const at = q => {
+      const a = t * .14 + k * 1.3 - q * .014;
+      return [W * (.5 + Math.sin(a + k) * .4 + Math.sin(a * 2.1) * .04), H * (.5 + Math.sin(a * 1.6 + k * 2) * .36)];
+    };
+    const [tx, ty] = at(11), [nx, ny] = at(9), len = Math.hypot(tx - nx, ty - ny) || 1, ux = (tx - nx) / len, uy = (ty - ny) / len, wag = Math.sin(t * 3 + k) * 8 * U, tail = 30 * U;
+    poly([[tx, ty], [tx + ux * tail - uy * (16 * U + wag), ty + uy * tail + ux * (16 * U + wag)], [tx + ux * tail + uy * (16 * U - wag), ty + uy * tail - ux * (16 * U - wag)]], body);
+    for (let i = 10; i >= 0; i--) {
+      const [x, y] = at(i), r = (5 + Math.sin((i + 1) / 12 * Math.PI) * 15) * U;
+      disc(x, y, r, i === 3 || i === 7 ? spot : body);
+    }
+  });
+  for (const p of PADS) {
+    const x = p.x * W + Math.sin(t * .15 + p.x * 9) * 8 * U, y = p.y * H + Math.cos(t * .12 + p.y * 9) * 6 * U, r = p.r * U;
+    c.fillStyle = '#2f7a4a';
+    c.beginPath(); c.arc(x, y, r, .16, Math.PI * 2 - .02); c.lineTo(x, y); c.closePath(); c.fill();
+    if (p.flower) {
+      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + t * .05; oval(x + Math.cos(a) * r * .24, y + Math.sin(a) * r * .24, r * .2, r * .2, '#f7bfd8'); }
+      disc(x, y, r * .13, '#ffd76a');
+    }
+  }
+}
+
+function drawPeaks(t) {
+  const sky = c.createLinearGradient(0, 0, 0, H * .8);
+  sky.addColorStop(0, '#6d86c4'); sky.addColorStop(.6, '#f2b6a0'); sky.addColorStop(1, '#ffe2b0');
+  c.fillStyle = sky; c.fillRect(0, 0, W, H);
+  halo(W * .68, H * .34, 300 * U, 'rgba(255,235,190,.9)', .75);
+  disc(W * .68, H * .34, 46 * U, '#fff3d0');
+  [['#b2a9cf', .46, 150, .006], ['#8f8ab8', .56, 130, .01], ['#6c6c9c', .66, 110, .016], ['#46507a', .77, 90, .024], ['#2a3456', .88, 70, .036]].forEach(([col, base, amp, speed], k) => {
+    c.fillStyle = col;
+    c.beginPath(); c.moveTo(0, H);
+    for (let x = 0; x <= W + 16; x += 16) {
+      const p = x * U ** -1 * .0035 + t * speed + k * 7;
+      c.lineTo(x, H * base - (Math.sin(p * 1.3) * .55 + Math.sin(p * 3.1 + k) * .28 + Math.sin(p * 7.3) * .1) * amp * U);
+    }
+    c.lineTo(W, H); c.closePath(); c.fill();
+    const mist = c.createLinearGradient(0, H * base - 30 * U, 0, H * (base + .12));
+    mist.addColorStop(0, 'rgba(255,240,225,0)'); mist.addColorStop(1, 'rgba(255,240,225,.28)');
+    c.fillStyle = mist; c.fillRect(0, H * base - 30 * U, W, H * .16);
+  });
+}
+
+function drawStarry(t) {
+  const sky = c.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#050a24'); sky.addColorStop(.7, '#16204e'); sky.addColorStop(1, '#3a3060');
+  c.fillStyle = sky; c.fillRect(0, 0, W, H);
+  // Long-exposure trails wheeling around one point in the sky.
+  const px = W * .5, py = H * .3, sweep = .34;
+  c.lineCap = 'round';
+  for (let i = 0; i < 260; i++) {
+    const a = i * 2.399 + t * .012, r = Math.sqrt(i / 260) * Math.hypot(W, H) * .8;
+    c.strokeStyle = i % 7 ? 'rgba(214,226,255,.55)' : 'rgba(255,214,150,.65)';
+    c.lineWidth = (.8 + (i % 4) * .35) * U;
+    c.beginPath(); c.arc(px, py, r, a, a + sweep); c.stroke();
+  }
+  c.lineCap = 'butt';
+  const m = t % 19;
+  if (m < 1.1) {
+    const q = m / 1.1, x = W * (.2 + q * .5), y = H * (.12 + q * .3);
+    c.strokeStyle = `rgba(255,255,255,${1 - q})`; c.lineWidth = 2.4 * U;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x - 120 * U, y - 70 * U); c.stroke();
+  }
+  c.fillStyle = '#060814';
+  c.beginPath(); c.moveTo(0, H); c.lineTo(0, H * .82);
+  for (let x = 0; x <= W + 16; x += 16) c.lineTo(x, H * .84 - Math.abs(Math.sin(x * .05)) * 26 * U - Math.sin(x * .007) * 24 * U);
+  c.lineTo(W, H); c.closePath(); c.fill();
+  halo(W * .22, H * .86, 60 * U, 'rgba(255,170,80,.8)', .55 + Math.sin(t * 4) * .08);
+  disc(W * .22, H * .86, 3 * U, '#ffd28a');
+}
+
 const CLASSICS = [
   ['SWIRL', drawSwirl, 'classics'], ['BARS', drawSpectrum, 'classics'], ['PLASMA', drawPlasma, 'classics'], ['KALEIDO', drawKaleido, 'classics'], ['SCOPE', drawScope, 'classics'],
   ['BATTERY', drawBattery, 'wmp9'], ['ALCHEMY', drawAlchemy, 'wmp9'], ['AMBIENCE', drawAmbience, 'wmp9'], ['FIRE', drawFirestorm, 'wmp9'], ['MIST', drawMist, 'wmp9'],
   ['SPIKES', drawSpikes, 'xp'], ['PLENOPT', drawPlenoptic, 'xp'], ['PARTICLE', drawParticle, 'xp'], ['COLORS', drawColors, 'xp'], ['DOTS', drawDots, 'xp'],
+  ['SUNSET', drawSunset, 'chill'], ['AURORA', drawAurora, 'chill'], ['HEARTH', drawHearth, 'chill'], ['RAIN', drawRain, 'chill'],
+  ['LAVA', drawLava, 'chill'], ['KOI', drawKoi, 'chill'], ['PEAKS', drawPeaks, 'chill'], ['STARS', drawStarry, 'chill'],
 ];
 
 // Each shuffle plays everything once before repeating.
-const SHUFFLE_SECONDS = { classics: 25, wmp9: 25, xp: 25, spooky: 40 };
+const SHUFFLE_SECONDS = { classics: 25, wmp9: 25, xp: 25, spooky: 40, chill: 90 };
 let shuffleMode = '', shuffleAt = 0, shuffleBag = [];
 
 function shuffleStep() {
@@ -2142,6 +2347,7 @@ function frame(ms) {
 setScene(0, 0);
 const startList = new URLSearchParams(location.search).get('list') || parseList(PLAYLIST) || store.get('ghoulamp.list');
 if (startList) { yt.list = startList; $('yt-empty').hidden = true; $('url').value = `https://www.youtube.com/playlist?list=${startList}`; }
+if (new URLSearchParams(location.search).has('chill')) setShuffle('chill');
 if (location.protocol === 'file:') note('YouTube needs a web address. Open this from GitHub Pages, not as a file.', true);
 
 const api = document.createElement('script');
