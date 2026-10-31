@@ -265,12 +265,14 @@ async function useTab(other) {
     // Chrome normally jumps to the shared tab, and the visuals stop when this tab is hidden.
     const controller = other && window.CaptureController ? new CaptureController() : null;
     try { controller?.setFocusBehavior('no-focus-change'); } catch {}
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 1, width: 320 },
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
-      systemAudio: 'include',
-      ...(other ? { selfBrowserSurface: 'exclude', ...(controller ? { controller } : {}) } : { preferCurrentTab: true }),
-    });
+    // Plain options for another tab: Chrome ignores no-focus-change with the tuned ones.
+    const stream = await navigator.mediaDevices.getDisplayMedia(other
+      ? { video: true, audio: true, systemAudio: 'include', selfBrowserSurface: 'exclude', ...(controller ? { controller } : {}) }
+      : {
+        video: { frameRate: 1, width: 320 },
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
+        systemAudio: 'include', preferCurrentTab: true,
+      });
     if (!stream.getAudioTracks().length) {
       stream.getTracks().forEach(tr => tr.stop());
       return note('No audio came through. Press the button again and switch on "Also share tab audio".', true);
