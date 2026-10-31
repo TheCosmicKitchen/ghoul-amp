@@ -19,6 +19,8 @@
   #scan { position: fixed; inset: 0; pointer-events: none;
     background: repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 1px, transparent 1px 3px); }
   #main.shade > :not(.bar) { display: none; }
+  #picker { gap: 2px; }
+  #picker button { flex: 1; min-width: 0; min-height: 24px; padding: 0; font-size: 16px; }
   body.party { cursor: none; }
 
   .win { position: fixed; width: 400px; max-width: calc(100vw - 32px); user-select: none;
@@ -125,9 +127,10 @@
     <button id="full" title="Fullscreen (F)">FULLSCREEN</button>
     <button id="scene" title="Next scene (N)">NEXT SCENE</button>
   </div>
+  <div class="row" id="picker" role="group" aria-label="Choose a scene"></div>
 </section>
 
-<div id="hint">H party mode · F fullscreen · N scene · double-click for party mode</div>
+<div id="hint">H party mode · F fullscreen · N next scene · 1-9 and Shift+1-6 pick a scene</div>
 
 <script>
 // Paste your playlist link or ID here so it loads for everyone without pasting it in.
@@ -1060,6 +1063,7 @@ function setScene(i, t) {
   sceneIx = (i + scenes.length) % scenes.length;
   sceneAt = t; wipe = 1; ghosts.length = 0; motes.length = 0; fx.length = 0;
   $('sceneName').textContent = sceneIx + 1;
+  [...$('picker').children].forEach((b, n) => b.classList.toggle('on', n === sceneIx));
 }
 
 function overlays(t, dt) {
@@ -1514,6 +1518,14 @@ const nextScene = () => setScene(sceneIx + 1, performance.now() / 1000);
 $('party').onclick = toggleParty;
 $('full').onclick = toggleFull;
 $('scene').onclick = nextScene;
+scenes.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.textContent = i + 1;
+  b.title = s.name;
+  b.setAttribute('aria-label', `Scene ${i + 1}: ${s.name}`);
+  b.onclick = () => setScene(i, performance.now() / 1000);
+  $('picker').append(b);
+});
 stage.ondblclick = toggleParty;
 stage.onclick = stageClick;
 addEventListener('pointermove', e => { mouse.x = e.clientX / innerWidth; mouse.y = e.clientY / innerHeight; });
@@ -1536,6 +1548,7 @@ addEventListener('keydown', e => {
   if (k === 'h') toggleParty();
   else if (k === 'f') toggleFull();
   else if (k === 'n') nextScene();
+  else if (e.shiftKey && /^Digit[1-6]$/.test(e.code)) setScene(8 + +e.code.slice(5), performance.now() / 1000);
   else if (k >= '1' && k <= '9') setScene(+k - 1, performance.now() / 1000);
 });
 
