@@ -24,9 +24,6 @@
   #chill, #toggles { flex-wrap: wrap; }
   #chill button, #toggles button { flex: 1 1 23%; }
   body.no-scan #scan { display: none; }
-  #list[data-frame=chill] { background: #e8dcc6; border-color: #fff4e0; border-radius: 10px; box-shadow: 0 6px 22px rgba(0,0,0,.45); }
-  #list[data-frame=chill] .bar { background: #e8dcc6; color: #6a5238; letter-spacing: 2px; }
-  #list[data-frame=chill] .bar span { background: none; }
   .vis-row button { flex: 1; min-width: 0; padding: 3px 0; font-size: 16px; }
   #tabStatus { flex: none; min-width: 112px; padding: 0 4px; text-align: center; color: var(--dim); }
   #tabStatus.good { color: var(--led); }
@@ -48,41 +45,14 @@
     background: var(--metal); padding: 3px;
     border: 2px solid; border-color: var(--metal-hi) var(--metal-lo) var(--metal-lo) var(--metal-hi);
     box-shadow: 0 8px 28px rgba(0,0,0,.65); transition: opacity .3s; }
-  /* YouTube's rules: the player stays on screen, at least 200x200, with nothing in front of it. */
   body.party #main { opacity: 0; pointer-events: none; }
   body.party #menu { top: 42px; left: 16px; right: auto; }
   body.party.dock-bottom #menu { top: auto; bottom: 42px; }
-  body.party.dock-bottom #list { bottom: 42px; }
-  body.party #list > :not(#yt-wrap, .bar, .grip) { display: none; }
-  body.party #list { left: auto !important; top: auto !important; right: 8px; bottom: 8px; width: var(--cam-w, 210px); }
-  body.party #yt-wrap { margin-top: 0; }
-  body.party.stream #list { left: 12px !important; right: auto; width: var(--stream-w, 366px); }
-  body.party.stream #menu { left: auto; right: 16px; }
   .grip { position: absolute; right: 0; bottom: 0; z-index: 1; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none;
     background: repeating-linear-gradient(135deg, transparent 0 3px, var(--orange) 3px 5px); }
-  #list .grip { top: 3px; right: 3px; bottom: auto; height: 20px; cursor: ew-resize; }
-  body.party #list .grip { left: 3px; right: auto; }
-  body.party.stream #list .grip { left: auto; right: 3px; }
   .bar button { min-height: 16px; height: 16px; margin-left: auto; padding: 0 6px; font-size: 14px; line-height: 12px; letter-spacing: 0; }
 
-  /* The video's frame follows whatever is on screen. */
-  #list { width: var(--list-w, 366px); --accent: #7a66a3; }
-  #list[data-frame=spooky] { background: #0c0a10; border-color: var(--accent); box-shadow: 0 0 22px var(--accent); }
-  #list[data-frame=spooky] .bar { background: #0c0a10; color: var(--accent); }
-  #list[data-frame=spooky] .bar span { background: none; }
-  #list[data-frame=wmp9] { border-color: #4f9be0; border-radius: 8px; background: linear-gradient(#123a70, #06182f); box-shadow: 0 0 18px #2a6fc4; }
-  #list[data-frame=wmp9] .bar { background: linear-gradient(#2a6fc4, #0d2f5e); color: #dff0ff; border-radius: 5px 5px 0 0; }
-  #list[data-frame=wmp9] .bar span { background: none; }
-  #list[data-frame=xp] { border: 3px solid #0a4fd0; border-radius: 8px 8px 2px 2px; background: #0a4fd0; }
-  #list[data-frame=xp] .bar { background: linear-gradient(#3b8cf5, #0a5fe0 45%, #0a4fd0); color: #fff; border-radius: 5px 5px 0 0; letter-spacing: 1px; }
-  #list[data-frame=xp] .bar span { background: none; }
-  #list[data-frame=stream] { background: #120a22; border-color: #e23bff; box-shadow: 0 0 20px #e23bff, 0 0 44px rgba(90,240,255,.45); }
-  #list[data-frame=stream] .bar { background: linear-gradient(90deg, #e23bff, #5af0ff); color: #120a22; }
-  #list[data-frame=stream] .bar span { background: none; }
-  body.no-video #list { display: none; }
-  body.dragging iframe { pointer-events: none; }
   #main { left: 16px; top: 16px; z-index: 2; }
-  #list { left: 16px; top: 236px; z-index: 2; }
   #menu { right: 16px; top: 16px; width: 400px; max-height: calc(100vh - 32px); overflow: auto; z-index: 3; }
 
   .bar { display: flex; align-items: center; gap: 8px; height: 20px; padding: 0 6px; cursor: grab;
@@ -120,17 +90,10 @@
   .grow { flex: 1; }
   .spacer { margin-left: auto; }
 
-  #yt-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 200px; background: #000; margin-top: 4px; }
-  #yt-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  #yt-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
-    text-align: center; color: var(--dim); }
-  #url { font: inherit; width: 100%; min-width: 0; padding: 3px 6px; height: 28px; color: var(--led);
-    background: var(--lcd); border: 1px solid var(--metal-lo); user-select: text; }
   #note { margin-top: 4px; padding: 2px 4px; color: var(--bone); }
   #note:empty { display: none; }
   #note.bad { color: #ff9c6b; }
   #hint { margin-top: 4px; color: var(--dim); font-size: 16px; line-height: 1.1; }
-  @media (max-height: 520px) { #list { left: 398px; top: 16px; } }
   @media (max-width: 860px) {
     html, body { overflow: auto; }
   }
@@ -148,31 +111,11 @@
     <canvas id="mini" width="152" height="40" title="Click to switch between spectrum and oscilloscope"></canvas>
     <div id="marquee"><b id="title">*** WINVAMP *** IT REALLY WHIPS THE VAMPIRE'S ASS ***</b></div>
   </div>
-  <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
-  <div class="row">
-    <button id="prev" aria-label="Previous track">|&lt;</button>
-    <button id="play" aria-label="Play">&gt;</button>
-    <button id="pause" aria-label="Pause">||</button>
-    <button id="next" aria-label="Next track">&gt;|</button>
-    <button id="shuffle" title="Shuffle the playlist">SHUF</button>
-    <label class="spacer" for="vol">VOL</label>
-    <input type="range" id="vol" min="0" max="100" value="80" style="width:96px">
-  </div>
   <div class="row">
     <button id="menuBtn" class="grow" title="Scenes, visualizers, shuffles and tab audio (Q)">MENU</button>
     <button id="party" class="grow" title="Shrink everything to a bar that hides itself (H)">BAR</button>
     <button id="full" class="grow" title="Fullscreen party mode. Esc to leave (F)">FULL</button>
   </div>
-</section>
-
-<section class="win" id="list" aria-label="Playlist">
-  <div class="bar" data-drag><span id="frameName">PLAYLIST</span></div>
-  <div class="grip" data-size="list" title="Drag to resize the video"></div>
-  <div class="row">
-    <input id="url" class="grow" placeholder="Paste a YouTube playlist link" aria-label="YouTube playlist link" spellcheck="false">
-    <button id="load">LOAD</button>
-  </div>
-  <div id="yt-wrap"><div id="yt-empty">No playlist loaded yet</div><div id="yt"></div></div>
   <div id="note"></div>
 </section>
 
@@ -180,11 +123,8 @@
   <div class="bar" data-drag><span>MENU</span><button data-click="menuBtn" title="Close the menu">X</button></div>
   <div class="grip" data-size="menu" title="Drag to resize"></div>
   <div class="row">
-    <button id="srcTab" class="grow" title="Makes the visuals follow the video playing here">REACT TO THIS TAB</button>
+    <button id="srcOther" class="grow" title="Makes the visuals follow the sound of another tab">LISTEN TO ANOTHER TAB</button>
     <span id="tabStatus">OFF</span>
-  </div>
-  <div class="row">
-    <button id="srcOther" class="grow" title="Makes the visuals follow another tab, and removes the video here">LISTEN TO ANOTHER TAB</button>
   </div>
   <div class="row">
     <button id="shuffleSpooky" class="grow" data-mode="spooky" title="Random Halloween scenes (S)">SPOOKY SCARY SHUFFLE</button>
@@ -207,15 +147,11 @@
   <div class="row"><label>SHOW</label></div>
   <div class="row vis-row" id="toggles" role="group" aria-label="Show or hide elements"></div>
   <div class="row"><button id="newVillage" class="grow" title="Starts a new town and replaces the saved one">FOUND A NEW VILLAGE</button></div>
-  <div id="stats"><span><i>666</i> kbps</span><span><i>31</i> kHz</span><span>scene <i id="sceneName">-</i></span><span id="trackNo">-/-</span></div>
+  <div id="stats"><span><i>666</i> kbps</span><span><i>31</i> kHz</span><span>scene <i id="sceneName">-</i></span></div>
   <div id="hint">Q menu · H bar · F full · Esc leave · N next scene · W visualizers · S spooky · X classic · 1-9, Shift+1-8 scenes</div>
 </section>
 
 <nav id="dock" aria-label="Controls bar">
-  <button data-click="prev" aria-label="Previous track">|&lt;</button>
-  <button data-click="play" aria-label="Play">&gt;</button>
-  <button data-click="pause" aria-label="Pause">||</button>
-  <button data-click="next" aria-label="Next track">&gt;|</button>
   <span id="dockClock">00:00</span>
   <span id="dockTitle">WINVAMP</span>
   <button data-click="scene" title="Next scene">NEXT</button>
@@ -224,13 +160,10 @@
   <button id="dockPin" title="Keep the bar on screen">PIN</button>
   <button data-click="full" title="Fullscreen on or off">FULL</button>
   <button id="dockHide" title="Hide this bar. Move the mouse to bring it back">HIDE</button>
-  <button data-click="party" title="Back to the full player">EXPAND</button>
+  <button data-click="party" title="Back to the full controls">EXPAND</button>
 </nav>
 
 <script>
-// Paste your playlist link or ID here so it loads for everyone without pasting it in.
-const PLAYLIST = '';
-
 const $ = id => document.getElementById(id);
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const store = {
@@ -260,30 +193,22 @@ function stopTab() {
   A.stream?.getTracks().forEach(tr => { tr.onended = null; tr.stop(); });
   A.stream = A.src = A.analyser = null;
   A.live = false;
-  $('srcTab').classList.remove('on');
   $('srcOther').classList.remove('on');
-  document.body.classList.remove('no-video');
 }
 
-async function useTab(other) {
+async function useTab() {
   if (A.stream) { stopTab(); return note('Tab audio off. The visuals are back on their built-in pulse.'); }
   if (!navigator.mediaDevices?.getDisplayMedia) return note('This browser cannot share tab audio. Use Chrome or Edge on a computer.', true);
   // Started inside the click: once the popup has closed, Chrome can refuse to start it.
   A.ctx ||= new (window.AudioContext || window.webkitAudioContext)();
   A.ctx.resume();
   try {
-    note(other ? 'In the popup, pick the tab with the music and switch on "Also share tab audio".' : 'In the popup, share this tab and switch on "Also share tab audio".');
+    note('In the popup, pick the tab with the music and switch on "Also share tab audio".');
     // Chrome normally jumps to the shared tab, and the visuals stop when this tab is hidden.
-    const controller = other && window.CaptureController ? new CaptureController() : null;
+    const controller = window.CaptureController ? new CaptureController() : null;
     try { controller?.setFocusBehavior('no-focus-change'); } catch {}
-    // Plain options for another tab: Chrome ignores no-focus-change with the tuned ones.
-    const stream = await navigator.mediaDevices.getDisplayMedia(other
-      ? { video: true, audio: true, systemAudio: 'include', selfBrowserSurface: 'exclude', ...(controller ? { controller } : {}) }
-      : {
-        video: { frameRate: 1, width: 320 },
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
-        systemAudio: 'include', preferCurrentTab: true,
-      });
+    // Plain options on purpose: Chrome ignores no-focus-change with tuned ones.
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, systemAudio: 'include', selfBrowserSurface: 'exclude', ...(controller ? { controller } : {}) });
     if (!stream.getAudioTracks().length) {
       stream.getTracks().forEach(tr => tr.stop());
       return note('No audio came through. Press the button again and switch on "Also share tab audio".', true);
@@ -301,15 +226,10 @@ async function useTab(other) {
     stream.getAudioTracks().forEach(tr => tr.onended = () => {
       if (A.stream !== stream) return;
       stopTab();
-      note('Sharing stopped. The video is back.', true);
+      note('Sharing stopped. Press LISTEN TO ANOTHER TAB to reconnect.', true);
     });
-    $(other ? 'srcOther' : 'srcTab').classList.add('on');
-    if (other) {
-      // YouTube's rules: nothing plays from a player that isn't on screen.
-      if (yt.ready) yt.player.pauseVideo();
-      document.body.classList.add('no-video');
-    }
-    note('Connected. Press play and watch the status next to the button.');
+    $('srcOther').classList.add('on');
+    note('Connected. Play music in that tab and watch the status next to the button.');
   } catch (err) {
     note(err.name === 'NotAllowedError' ? 'Sharing was cancelled. Press the button to try again.' : `Tab audio failed: ${err.message}`, true);
   }
@@ -325,7 +245,7 @@ function tabStatus(t) {
 
 // The built-in pulse, used whenever real sound isn't reaching the page.
 function fakeAudio(t) {
-  const amp = yt.playing ? .85 : .55, b = t * 88 / 60;
+  const amp = .7, b = t * 88 / 60;
   const kick = Math.exp(-(b % 1) * 7), hat = Math.exp(-((b * 2) % 1) * 12);
   for (let i = 0; i < BINS; i++) {
     const x = i / BINS;
@@ -1698,13 +1618,9 @@ function drawMotes(dt, size) {
 let classic = -1, sceneIx = 0, sceneAt = 0, wipe = 1, flash = 0, lastFlash = 0, card = '', cardAt = -99;
 const SCENE_SECONDS = 75;
 
-const ACCENTS = ['#8f6ad8', '#ff7a18', '#5fe08a', '#ff2038', '#d7cdb6', '#e0a14e', '#6ee8d8', '#9fe0b8', '#d9b98a', '#a9a394', '#c8601e', '#6fe07a', '#9fb4b4', '#d9875a', '#e27c1c', '#efeee6', '#ff3a2a'];
-
 function syncFrame() {
   const onClassic = classic >= 0, streaming = !onClassic && scenes[sceneIx].name === 'THE MAZE';
-  $('list').dataset.frame = onClassic ? CLASSICS[classic][2] : streaming ? 'stream' : 'spooky';
-  $('list').style.setProperty('--accent', ACCENTS[sceneIx]);
-  $('frameName').textContent = streaming ? 'ON CAM  //  LIVE' : onClassic ? CLASSICS[classic][0] : scenes[sceneIx].name;
+  $('title').textContent = `*** ${onClassic ? CLASSICS[classic][0] : scenes[sceneIx].name} ***`;
   document.body.classList.toggle('stream', streaming);
 }
 
@@ -4135,89 +4051,12 @@ function drawMini() {
   }
 }
 
-/* ---------- YouTube ---------- */
-const yt = { player: null, ready: false, playing: false, list: null, seeking: false, title: '', skipped: 0 };
-
-function parseList(text) {
-  const s = (text || '').trim();
-  return s.match(/[?&]list=([\w-]+)/)?.[1] || (/^[\w-]{10,}$/.test(s) ? s : null);
-}
-
-function loadList(id, autoplay) {
-  yt.list = id; yt.skipped = 0;
-  $('yt-empty').hidden = true;
-  store.set('ghoulamp.list', id);
-  if (!yt.ready) return;
-  const opts = { list: id, listType: 'playlist' };
-  autoplay ? yt.player.loadPlaylist(opts) : yt.player.cuePlaylist(opts);
-  yt.player.setLoop(true);
-}
-
-window.onYouTubeIframeAPIReady = () => {
-  const http = location.protocol.startsWith('http');
-  yt.player = new YT.Player('yt', {
-    width: '100%', height: '100%',
-    playerVars: { playsinline: 1, rel: 0, modestbranding: 1, ...(http ? { origin: location.origin } : {}) },
-    events: {
-      onReady() {
-        yt.ready = true;
-        yt.player.setVolume(+$('vol').value);
-        if (yt.list) loadList(yt.list, false);
-      },
-      onStateChange(e) {
-        yt.playing = e.data === YT.PlayerState.PLAYING;
-        if (yt.playing) {
-          const title = yt.player.getVideoData()?.title;
-          if (title && title !== yt.title) {
-            yt.title = title; card = title; cardAt = performance.now() / 1000;
-            $('title').textContent = `*** ${title} ***`;
-          }
-        }
-      },
-      onError(e) {
-        // 100, 101 and 150 are removed or embed-blocked tracks: skip them and keep the party going.
-        if ([5, 100, 101, 150].includes(e.data)) {
-          yt.skipped++;
-          note(`Skipped ${yt.skipped} track${yt.skipped > 1 ? 's' : ''} that YouTube won't play in an embed.`);
-          yt.player.nextVideo();
-        } else note(location.protocol === 'file:' ? 'YouTube needs a web address. Open this from GitHub Pages, not as a file.' : `YouTube error ${e.data}. Check the playlist is public or unlisted.`, true);
-      },
-    },
-  });
-};
-
-function syncPlayer() {
-  if (!yt.ready || !yt.player.getDuration) return;
-  const now = yt.player.getCurrentTime() || 0, dur = yt.player.getDuration() || 0;
-  const stamp = `${String(Math.floor(now / 60)).padStart(2, '0')}:${String(Math.floor(now % 60)).padStart(2, '0')}`;
-  $('clock').textContent = stamp;
-  if (dur && !yt.seeking) $('seek').value = now / dur * 1000;
-  const total = yt.player.getPlaylist?.()?.length;
-  $('trackNo').textContent = total ? `${yt.player.getPlaylistIndex() + 1}/${total}` : '-/-';
+function syncClock() {
+  const d = new Date();
+  $('clock').textContent = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 /* ---------- controls ---------- */
-const act = fn => () => yt.ready && !document.body.classList.contains('no-video') && fn(yt.player);
-$('prev').onclick = act(p => p.previousVideo());
-$('next').onclick = act(p => p.nextVideo());
-$('play').onclick = act(p => p.playVideo());
-$('pause').onclick = act(p => p.pauseVideo());
-$('shuffle').onclick = act(p => {
-  const on = $('shuffle').classList.toggle('on');
-  p.setShuffle(on);
-  if (on) p.nextVideo();
-});
-$('vol').oninput = e => yt.ready && yt.player.setVolume(+e.target.value);
-$('seek').onpointerdown = () => { yt.seeking = true; };
-$('seek').onchange = e => {
-  yt.seeking = false;
-  if (yt.ready) yt.player.seekTo(e.target.value / 1000 * yt.player.getDuration(), true);
-};
-$('load').onclick = () => {
-  const id = parseList($('url').value);
-  id ? loadList(id, true) : note('That doesn\'t look like a playlist link. It should contain "list=".', true);
-};
-$('url').onkeydown = e => { if (e.key === 'Enter') $('load').click(); };
 
 let dockAt = 0, dockPinned = store.get('winvamp.pin') === '1';
 let dockQuiet = 0;
@@ -4242,7 +4081,7 @@ function setDockPin(on) {
 // Slides the bar away once the mouse has been still for a few seconds.
 function syncDock() {
   $('dockClock').textContent = $('clock').textContent;
-  $('dockTitle').textContent = yt.title || 'WINVAMP';
+  $('dockTitle').textContent = $('title').textContent.replace(/\*/g, '').trim();
   const body = document.body;
   if (body.classList.contains('party') && !dockPinned && $('menu').hidden && !$('dock').matches(':hover') && clock - dockAt > 3) body.classList.add('dock-away');
 }
@@ -4255,29 +4094,22 @@ $('dockHide').onclick = () => { dockQuiet = clock + 1.2; document.body.classList
 $('mainHide').onclick = () => setParty(true);
 
 // Drag any corner grip to resize. Sizes are remembered per window.
-const SIZE_LIMITS = { main: [260, 720], menu: [300, 720], list: [366, 960], cam: [210, 960], stream: [366, 960] };
-let sizes = { main: 366, menu: 400, list: 366, cam: 210, stream: 366 };
+const SIZE_LIMITS = { main: [260, 720], menu: [300, 720] };
+let sizes = { main: 366, menu: 400 };
 try { sizes = { ...sizes, ...JSON.parse(store.get('winvamp.sizes') || '{}') }; } catch {}
 function applySizes() {
   $('main').style.zoom = sizes.main / 366;
   $('menu').style.zoom = sizes.menu / 400;
-  const root = document.documentElement.style;
-  root.setProperty('--list-w', `${sizes.list}px`);
-  root.setProperty('--cam-w', `${sizes.cam}px`);
-  root.setProperty('--stream-w', `${sizes.stream}px`);
 }
 for (const grip of document.querySelectorAll('.grip')) {
   grip.onpointerdown = e => {
     e.preventDefault();
     grip.setPointerCapture(e.pointerId);
     document.body.classList.add('dragging');
-    const body = document.body.classList, win = grip.parentElement;
-    const party = body.contains('party'), stream = party && body.contains('stream');
-    const key = grip.dataset.size === 'list' ? (stream ? 'stream' : party ? 'cam' : 'list') : grip.dataset.size;
-    const fromRight = key === 'cam', r = win.getBoundingClientRect();
+    const key = grip.dataset.size, r = grip.parentElement.getBoundingClientRect();
     grip.onpointermove = ev => {
       const [low, high] = SIZE_LIMITS[key];
-      sizes[key] = clamp(fromRight ? r.right - ev.clientX : ev.clientX - r.left, low, Math.min(high, innerWidth - 16));
+      sizes[key] = clamp(ev.clientX - r.left, low, Math.min(high, innerWidth - 16));
       applySizes();
     };
     grip.onpointerup = () => {
@@ -4324,8 +4156,7 @@ Object.entries(SHOW_LABELS).forEach(([key, label]) => {
   sync();
   $('toggles').append(b);
 });
-$('srcTab').onclick = () => useTab(false);
-$('srcOther').onclick = () => useTab(true);
+$('srcOther').onclick = useTab;
 CLASSICS.forEach(([name, , group], i) => {
   const b = document.createElement('button');
   b.textContent = name;
@@ -4390,26 +4221,19 @@ function frame(ms) {
   bc.drawImage(stage, 0, 0);
   overlays(t, dt);
   drawMini();
-  if (++frameNo % 15 === 0) { syncPlayer(); tabStatus(t); syncDock(); }
+  if (++frameNo % 15 === 0) { syncClock(); tabStatus(t); syncDock(); }
 }
 
 setScene(0, 0);
-const startList = new URLSearchParams(location.search).get('list') || parseList(PLAYLIST) || store.get('ghoulamp.list');
-if (startList) { yt.list = startList; $('yt-empty').hidden = true; $('url').value = `https://www.youtube.com/playlist?list=${startList}`; }
 const startMode = new URLSearchParams(location.search);
 if (startMode.has('chill')) setShuffle('chill');
 if (startMode.has('quest')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawQuest));
 if (startMode.has('village')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVillage));
 if (startMode.has('train')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawTrain));
-if (location.protocol === 'file:') note('YouTube needs a web address. Open this from GitHub Pages, not as a file.', true);
 
-const api = document.createElement('script');
-api.src = 'https://www.youtube.com/iframe_api';
-api.onerror = () => note('Could not reach YouTube. Check the internet connection.', true);
-document.head.append(api);
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
-window.ghoulamp = { audio: A, yt, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, T_REGIONS, qNewParty };
+window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, T_REGIONS, qNewParty };
 </script>
 </body>
 </html>
