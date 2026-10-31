@@ -20,8 +20,11 @@
     background: repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 1px, transparent 1px 3px); }
   #main.shade > :not(.bar) { display: none; }
   body.classic #stage, body.stark #stage { filter: none; }
-  #picker, #classics { gap: 2px; }
-  #classics button { flex: 1; min-width: 0; padding: 3px 0; }
+  #picker, .vis-row { gap: 2px; }
+  .vis-row button { flex: 1; min-width: 0; padding: 3px 0; font-size: 16px; }
+  #tabStatus { flex: none; min-width: 112px; padding: 0 4px; text-align: center; color: var(--dim); }
+  #tabStatus.good { color: var(--led); }
+  #tabStatus.bad { color: #ff9c6b; }
   #picker button { flex: 1; min-width: 0; min-height: 24px; padding: 0; font-size: 16px; }
   body.party { cursor: none; }
 
@@ -36,7 +39,7 @@
   body.party #yt-wrap { margin-top: 0; }
   body.dragging iframe { pointer-events: none; }
   #main { left: 16px; top: 16px; z-index: 2; }
-  #list { left: 16px; top: 272px; z-index: 2; }
+  #list { left: 16px; top: 340px; z-index: 2; }
 
   .bar { display: flex; align-items: center; gap: 8px; height: 20px; padding: 0 6px; cursor: grab;
     color: var(--orange); letter-spacing: 3px; font-size: 16px; touch-action: none;
@@ -84,9 +87,9 @@
   #hint { position: fixed; right: 16px; bottom: 12px; color: rgba(233,224,201,.55); font-size: 16px;
     text-shadow: 0 1px 2px #000; pointer-events: none; }
   body.party #hint { opacity: 0; }
-  @media (max-height: 800px) { #list { left: 432px; top: 16px; } }
+  @media (max-height: 960px) { #list { left: 432px; top: 16px; } }
   @media (max-width: 860px) {
-    #list { left: 16px; top: 272px; }
+    #list { left: 16px; top: 340px; }
     html, body { overflow: auto; }
     #hint { display: none; }
   }
@@ -115,8 +118,16 @@
     <input type="range" id="vol" min="0" max="100" value="80" style="width:96px">
   </div>
   <div class="row">
-    <button id="shuffleClassic" class="grow" title="Random classics (X)">CLASSIC SHUFFLE</button>
-    <button id="shuffleSpooky" class="grow" title="Random Halloween scenes (S)">SPOOKY SCARY SHUFFLE</button>
+    <button id="shuffleClassic" class="grow" data-mode="classics" title="Random classics (X)">CLASSIC SHUFFLE</button>
+    <button id="shuffleSpooky" class="grow" data-mode="spooky" title="Random Halloween scenes (S)">SPOOKY SCARY SHUFFLE</button>
+  </div>
+  <div class="row">
+    <button id="shuffleWmp" class="grow" data-mode="wmp9" title="Rotates the Windows Media Player 9 set">WMP 9 ROTATE</button>
+    <button id="shuffleXp" class="grow" data-mode="xp" title="Rotates the Windows XP set">XP ROTATE</button>
+  </div>
+  <div class="row">
+    <button id="srcTab" class="grow" title="Makes the visuals follow this tab's sound">REACT TO TAB AUDIO</button>
+    <span id="tabStatus">OFF</span>
   </div>
 </section>
 
@@ -127,7 +138,7 @@
     <button id="load">LOAD</button>
   </div>
   <div id="yt-wrap"><div id="yt-empty">No playlist loaded yet</div><div id="yt"></div></div>
-  <div id="note">Load a playlist and press play. The scenes run on their own.</div>
+  <div id="note">Load a playlist and press play. Press REACT TO TAB AUDIO if you want the visuals to follow the music.</div>
   <div class="row">
     <button id="party" title="Show only the visuals and the video (H)">PARTY MODE</button>
     <button id="full" title="Fullscreen (F)">FULLSCREEN</button>
@@ -135,10 +146,14 @@
   </div>
   <div class="row" id="picker" role="group" aria-label="Choose a scene"></div>
   <div class="row"><label>WINAMP CLASSIC</label></div>
-  <div class="row" id="classics" role="group" aria-label="Winamp classic visualizers"></div>
+  <div class="row vis-row" id="classics" role="group" aria-label="Winamp classic visualizers"></div>
+  <div class="row"><label>WINDOWS MEDIA PLAYER 9</label></div>
+  <div class="row vis-row" id="wmp9" role="group" aria-label="Windows Media Player 9 visualizers"></div>
+  <div class="row"><label>WINDOWS XP</label></div>
+  <div class="row vis-row" id="xp" role="group" aria-label="Windows XP visualizers"></div>
 </section>
 
-<div id="hint">H party mode · F fullscreen · N next scene · W classics · X classic shuffle · S spooky shuffle · 1-9 and Shift+1-8 pick a scene</div>
+<div id="hint">H party mode · F fullscreen · N next scene · W visualizers · X classic shuffle · S spooky shuffle · 1-9 and Shift+1-8 pick a scene</div>
 
 <script>
 // Paste your playlist link or ID here so it loads for everyone without pasting it in.
@@ -154,15 +169,70 @@ const note = (msg, bad) => { $('note').textContent = msg; $('note').className = 
 
 /* ---------- pulse ---------- */
 const BINS = 1024, BARS = 64;
-const CALM = .6; // how hard the visuals react: 1 is full strength
 const A = {
+  ctx: null, analyser: null, stream: null, src: null, live: false, heard: 0,
   freq: new Uint8Array(BINS), wave: new Uint8Array(BINS * 2),
   bars: new Float32Array(BARS), peaks: new Float32Array(BARS),
   bass: 0, mid: 0, treble: 0, level: 0, peak: .1,
   beat: false, big: false, pulse: 0, hist: new Float32Array(45), hi: 0, lastBeat: 0,
 };
 
-// The scenes run on this invented pulse. YouTube's audio is never read.
+function stopTab() {
+  A.src?.disconnect();
+  A.stream?.getTracks().forEach(tr => { tr.onended = null; tr.stop(); });
+  A.stream = A.src = A.analyser = null;
+  A.live = false;
+  $('srcTab').classList.remove('on');
+}
+
+async function useTab() {
+  if (A.stream) { stopTab(); return note('Tab audio off. The visuals are back on their built-in pulse.'); }
+  if (!navigator.mediaDevices?.getDisplayMedia) return note('This browser cannot share tab audio. Use Chrome or Edge on a computer.', true);
+  // Started inside the click: once the popup has closed, Chrome can refuse to start it.
+  A.ctx ||= new (window.AudioContext || window.webkitAudioContext)();
+  A.ctx.resume();
+  try {
+    note('In the popup, share this tab and switch on "Also share tab audio".');
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 1, width: 320 },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
+      preferCurrentTab: true, systemAudio: 'include',
+    });
+    if (!stream.getAudioTracks().length) {
+      stream.getTracks().forEach(tr => tr.stop());
+      return note('No audio came through. Press the button again and switch on "Also share tab audio".', true);
+    }
+    await A.ctx.resume();
+    const analyser = A.ctx.createAnalyser();
+    analyser.fftSize = BINS * 2;
+    analyser.smoothingTimeConstant = .72;
+    analyser.minDecibels = -85;
+    analyser.maxDecibels = -18;
+    // Never connected to the speakers: the tab already plays this audio.
+    const src = A.ctx.createMediaStreamSource(stream);
+    src.connect(analyser);
+    Object.assign(A, { stream, src, analyser, peak: .1, heard: performance.now() / 1000 });
+    stream.getAudioTracks().forEach(tr => tr.onended = () => {
+      if (A.stream !== stream) return;
+      stopTab();
+      note('Sharing stopped. Press REACT TO TAB AUDIO to reconnect.', true);
+    });
+    $('srcTab').classList.add('on');
+    note('Connected. Press play and watch the status next to the button.');
+  } catch (err) {
+    note(err.name === 'NotAllowedError' ? 'Sharing was cancelled. Press REACT TO TAB AUDIO to try again.' : `Tab audio failed: ${err.message}`, true);
+  }
+}
+
+function tabStatus(t) {
+  const el = $('tabStatus');
+  const text = !A.stream ? 'OFF' : A.ctx.state !== 'running' ? 'AUDIO PAUSED' : A.live ? 'HEARING IT' : t - A.heard > 3 ? 'NO SOUND' : 'LISTENING';
+  el.textContent = text;
+  el.className = text === 'HEARING IT' ? 'good' : text === 'NO SOUND' || text === 'AUDIO PAUSED' ? 'bad' : '';
+  if (text === 'AUDIO PAUSED') A.ctx.resume();
+}
+
+// The built-in pulse, used whenever real sound isn't reaching the page.
 function fakeAudio(t) {
   const amp = yt.playing ? .85 : .55, b = t * 88 / 60;
   const kick = Math.exp(-(b % 1) * 7), hat = Math.exp(-((b * 2) % 1) * 12);
@@ -179,9 +249,16 @@ function fakeAudio(t) {
 }
 
 function readAudio(t, k) {
-  fakeAudio(t);
+  if (A.analyser) {
+    A.analyser.getByteFrequencyData(A.freq);
+    A.analyser.getByteTimeDomainData(A.wave);
+    if (A.freq.some(v => v > 24)) A.heard = t;
+  }
+  A.live = !!A.analyser && t - A.heard < 3;
+  if (!A.live) fakeAudio(t);
+  const CALM = A.live ? .95 : .6; // how hard the visuals react: 1 is full strength
 
-  const avg = (a, b) => { let s = 0; for (let i = a; i < b; i++) s += A.freq[i]; return s / (b - a) / 255; };
+  const avg =(a, b) => { let s = 0; for (let i = a; i < b; i++) s += A.freq[i]; return s / (b - a) / 255; };
   const rb = avg(1, 7), rm = avg(12, 85), rt = avg(170, 500);
   A.peak = Math.max(rb, rm * 1.5, A.peak * Math.pow(.9985, k), .08);
   const g = 1 / A.peak, soft = clamp(.16 * k), bass = clamp(rb * g);
@@ -1362,7 +1439,7 @@ const SCENE_SECONDS = 75;
 function setClassic(n) {
   classic = n; wipe = 1;
   document.body.classList.toggle('classic', n >= 0);
-  [...$('classics').children].forEach((b, i) => b.classList.toggle('on', i === n));
+  document.querySelectorAll('[data-vis]').forEach(b => b.classList.toggle('on', +b.dataset.vis === n));
 }
 
 // Plain old-school swirl: colour rings fed back into themselves.
@@ -1450,16 +1527,161 @@ function drawScope(t) {
   }
 }
 
-const CLASSICS = [['SWIRL', drawSwirl], ['BARS', drawSpectrum], ['PLASMA', drawPlasma], ['KALEIDO', drawKaleido], ['SCOPE', drawScope]];
+/* Windows Media Player 9 style */
+function drawBattery(t) {
+  feedback({ zoom: 1.035 + A.bass * .03, spin: .012 + Math.sin(t * .21) * .02, keep: .94 });
+  c.save(); c.translate(W / 2, H / 2);
+  const reach = Math.min(W, H) * .46;
+  c.lineWidth = 2.5 * U;
+  for (let s = 0; s < 6; s++) {
+    c.save(); c.rotate(s * Math.PI / 3 + t * .3);
+    c.strokeStyle = `hsl(${t * 50 + s * 20} 100% 60%)`;
+    c.beginPath();
+    for (let i = 0; i <= 90; i++) {
+      const x = i / 90 * reach, y = (A.wave[i * 8] - 128) / 128 * 110 * U * Math.sin(i / 90 * Math.PI);
+      i ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    c.stroke(); c.restore();
+  }
+  c.restore();
+}
+
+function drawAlchemy(t) {
+  feedback({ zoom: 1.006, spin: -.002, keep: .9 });
+  c.lineWidth = 2 * U;
+  const R = Math.min(W, H) * (.34 + A.bass * .1);
+  for (let k = 0; k < 3; k++) {
+    const fx = 2 + Math.floor(t / 11 + k) % 4, fy = 3 + Math.floor(t / 17 + k) % 3, ph = t * (.3 + k * .13);
+    c.strokeStyle = `hsl(${t * 24 + k * 110} 95% 62%)`;
+    c.beginPath();
+    for (let i = 0; i <= 260; i++) {
+      const a = i / 260 * Math.PI * 2, w = 1 + (A.wave[i * 4] - 128) / 128 * .22;
+      const x = W / 2 + Math.sin(a * fx + ph) * R * 1.45 * w, y = H / 2 + Math.sin(a * fy) * R * w;
+      i ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    c.stroke();
+  }
+}
+
+function drawAmbience(t) {
+  feedback({ zoom: 1.004, spin: .001, keep: .97, fade: '0,3,10' });
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 7; i++) {
+    const x = W * (.5 + Math.sin(t * .23 + i * 1.9) * .42), y = H * (.5 + Math.cos(t * .31 + i * 2.7) * .4);
+    const r = (130 + A.bars[i * 8] * 240) * U, hue = 190 + Math.sin(t * .1 + i) * 50;
+    const g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `hsla(${hue} 90% 55% / .1)`); g.addColorStop(1, `hsla(${hue} 90% 55% / 0)`);
+    c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  c.globalCompositeOperation = 'source-over';
+}
+
+function drawFirestorm() {
+  feedback({ dy: -8 * U, zoom: 1.004, keep: .9, fade: '6,0,0' });
+  const n = 44, bw = W / n;
+  for (let i = 0; i <= n; i++) {
+    const v = clamp(A.bars[Math.floor(i * (BARS - 1) / n)] * 1.7), h = (50 + v * 380 + rnd(0, 90)) * U, x = i * bw + rnd(-8, 8) * U;
+    poly([[x - bw * 1.1, H], [x + rnd(-16, 16) * U, H - h], [x + bw * 1.1, H]], `hsl(${6 + v * 42} 100% ${42 + v * 26}%)`);
+    poly([[x - bw * .5, H], [x, H - h * .5], [x + bw * .5, H]], '#ffe07a');
+  }
+}
+
+function drawMist(t) {
+  c.fillStyle = '#02060c'; c.fillRect(0, 0, W, H);
+  for (let l = 0; l < 12; l++) {
+    const base = H * (.3 + l * .055), hue = 200 + l * 6;
+    c.fillStyle = `hsla(${hue} 80% ${22 + l * 3}% / .22)`;
+    c.strokeStyle = `hsla(${hue} 90% 76% / .6)`; c.lineWidth = 1.4 * U;
+    c.beginPath(); c.moveTo(0, H);
+    for (let i = 0; i <= 90; i++) {
+      const x = i / 90 * W, v = A.bars[Math.floor(i / 90 * (BARS - 1))];
+      c.lineTo(x, base + Math.sin(i * .16 + t * (.7 + l * .08) + l) * (12 + l * 2) * U - v * 90 * U);
+    }
+    c.lineTo(W, H); c.closePath(); c.fill(); c.stroke();
+  }
+}
+
+/* Windows XP style */
+function drawSpikes(t) {
+  feedback({ keep: .62 });
+  c.save(); c.translate(W / 2, H / 2); c.rotate(t * .25);
+  const n = BARS * 2, inner = 54 * U;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, v = A.bars[i < BARS ? i : n - 1 - i], r = inner + (.08 + v * 1.5) * Math.min(W, H) * .78, w = Math.PI / n;
+    c.fillStyle = `hsl(${i / n * 360 + t * 30} 100% 58%)`;
+    c.beginPath(); c.moveTo(Math.cos(a - w) * inner, Math.sin(a - w) * inner); c.lineTo(Math.cos(a) * r, Math.sin(a) * r); c.lineTo(Math.cos(a + w) * inner, Math.sin(a + w) * inner); c.closePath(); c.fill();
+  }
+  c.restore();
+}
+
+function drawPlenoptic(t) {
+  c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+  c.lineWidth = (3 + A.bass * 4) * U;
+  [[-1, t * 20], [1, t * 20 + 150]].forEach(([dir, hue]) => {
+    const x = W / 2 + dir * Math.sin(t * .4) * W * .17, y = H / 2 + Math.cos(t * .31) * dir * H * .14;
+    c.strokeStyle = `hsl(${hue} 100% 58%)`;
+    for (let r = (t * 26) % 22; r < Math.hypot(W, H) * .8; r += 22) {
+      c.beginPath(); c.arc(x, y, r * U, 0, 7); c.stroke();
+    }
+  });
+}
+
+const sparks = [];
+function drawParticle(t, dt) {
+  feedback({ keep: .78 });
+  const burst = 3 + Math.floor(A.bass * 7) + (A.beat ? 30 : 0);
+  for (let i = 0; i < burst; i++) {
+    const a = rnd(0, 7), v = rnd(60, 280 + A.bass * 340) * U;
+    sparks.push({ x: W / 2, y: H / 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 90 * U, life: 1, hue: t * 40 + rnd(0, 70) });
+  }
+  if (sparks.length > 700) sparks.splice(0, sparks.length - 700);
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i];
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 240 * U * dt; p.life -= dt * .65;
+    if (p.life <= 0) { sparks.splice(i, 1); continue; }
+    disc(p.x, p.y, (1.5 + p.life * 3) * U, `hsl(${p.hue} 100% ${45 + p.life * 25}%)`);
+  }
+}
+
+function drawColors(t) {
+  c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+  const cols = 14, rows = 8, gap = 5 * U, cw = W / cols, ch = H / rows;
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const v = A.bars[(x * 4 + y * 3) % BARS];
+    c.fillStyle = `hsl(${x * 16 + y * 22 + t * 24} 100% ${18 + v * 62}%)`;
+    c.fillRect(x * cw + gap / 2, y * ch + gap / 2, cw - gap, ch - gap);
+  }
+}
+
+function drawDots(t) {
+  c.fillStyle = '#01030a'; c.fillRect(0, 0, W, H);
+  const cols = 42, rows = 26, spin = t * .12, cosA = Math.cos(spin), sinA = Math.sin(spin);
+  for (let y = rows - 1; y >= 0; y--) for (let x = 0; x < cols; x++) {
+    const gx = (x - cols / 2) / 2, gy = (y - rows / 2) / 2;
+    const rx = gx * cosA - gy * sinA, ry = gx * sinA + gy * cosA;
+    const lift = Math.sin(Math.hypot(rx, ry) * .9 - t * 2) * .55 + A.bars[(x + y * 2) % BARS] * 2.2;
+    const z = ry + 13;
+    if (z < 1) continue;
+    const scale = H * 1.05 / z, sx = W / 2 + rx * scale, sy = H * .34 + (2.2 - lift) * scale;
+    disc(sx, sy, Math.max(.8, 1.6 + lift * .8) * U * 11 / z, `hsl(${150 + lift * 70 + t * 16} 100% 62%)`);
+  }
+}
+
+const CLASSICS = [
+  ['SWIRL', drawSwirl, 'classics'], ['BARS', drawSpectrum, 'classics'], ['PLASMA', drawPlasma, 'classics'], ['KALEIDO', drawKaleido, 'classics'], ['SCOPE', drawScope, 'classics'],
+  ['BATTERY', drawBattery, 'wmp9'], ['ALCHEMY', drawAlchemy, 'wmp9'], ['AMBIENCE', drawAmbience, 'wmp9'], ['FIRE', drawFirestorm, 'wmp9'], ['MIST', drawMist, 'wmp9'],
+  ['SPIKES', drawSpikes, 'xp'], ['PLENOPT', drawPlenoptic, 'xp'], ['PARTICLE', drawParticle, 'xp'], ['COLORS', drawColors, 'xp'], ['DOTS', drawDots, 'xp'],
+];
 
 // Each shuffle plays everything once before repeating.
-const SHUFFLE_SECONDS = { classic: 25, spooky: 40 };
+const SHUFFLE_SECONDS = { classics: 25, wmp9: 25, xp: 25, spooky: 40 };
 let shuffleMode = '', shuffleAt = 0, shuffleBag = [];
 
 function shuffleStep() {
   const spooky = shuffleMode === 'spooky', current = spooky ? (classic < 0 ? sceneIx : -1) : classic;
   if (!shuffleBag.length) {
-    shuffleBag = [...(spooky ? scenes : CLASSICS).keys()].filter(n => n !== current);
+    const pool = spooky ? [...scenes.keys()] : [...CLASSICS.keys()].filter(n => CLASSICS[n][2] === shuffleMode);
+    shuffleBag = pool.filter(n => n !== current);
     shuffleBag.sort(() => Math.random() - .5);
   }
   const n = shuffleBag.pop();
@@ -1469,8 +1691,7 @@ function shuffleStep() {
 
 function setShuffle(mode) {
   shuffleMode = mode; shuffleBag = [];
-  $('shuffleClassic').classList.toggle('on', mode === 'classic');
-  $('shuffleSpooky').classList.toggle('on', mode === 'spooky');
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
   if (mode) shuffleStep();
 }
 
@@ -1935,13 +2156,14 @@ $('scene').onclick = nextScene;
 const pickScene = i => { setShuffle(''); setScene(i, performance.now() / 1000); };
 const nextClassic = () => { setShuffle(''); classic + 1 < CLASSICS.length ? setClassic(classic + 1) : setScene(sceneIx, performance.now() / 1000); };
 const toggleShuffle = mode => setShuffle(shuffleMode === mode ? '' : mode);
-$('shuffleClassic').onclick = () => toggleShuffle('classic');
-$('shuffleSpooky').onclick = () => toggleShuffle('spooky');
-CLASSICS.forEach(([name], i) => {
+document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => toggleShuffle(b.dataset.mode); });
+$('srcTab').onclick = useTab;
+CLASSICS.forEach(([name, , group], i) => {
   const b = document.createElement('button');
   b.textContent = name;
+  b.dataset.vis = i;
   b.onclick = () => { setShuffle(''); classic === i ? setScene(sceneIx, performance.now() / 1000) : setClassic(i); };
-  $('classics').append(b);
+  $(group).append(b);
 });
 scenes.forEach((s, i) => {
   const b = document.createElement('button');
@@ -1974,7 +2196,7 @@ addEventListener('keydown', e => {
   else if (k === 'f') toggleFull();
   else if (k === 'n') nextScene();
   else if (k === 'w') nextClassic();
-  else if (k === 'x') toggleShuffle('classic');
+  else if (k === 'x') toggleShuffle('classics');
   else if (k === 's') toggleShuffle('spooky');
   else if (e.shiftKey && /^Digit[1-8]$/.test(e.code)) pickScene(8 + +e.code.slice(5));
   else if (k >= '1' && k <= '9') pickScene(+k - 1);
@@ -2002,7 +2224,7 @@ function frame(ms) {
   readAudio(t, dt * 60);
   clock = t;
   if (shuffleMode && t > shuffleAt) shuffleStep();
-  if (classic >= 0) CLASSICS[classic][1](t);
+  if (classic >= 0) CLASSICS[classic][1](t, dt);
   else {
     if (!shuffleMode && t - sceneAt > SCENE_SECONDS && A.beat) setScene(sceneIx + 1, t);
     scenes[sceneIx].draw(t, dt);
@@ -2014,7 +2236,7 @@ function frame(ms) {
   overlays(t, dt);
   drawWhisper(t);
   drawMini();
-  if (++frameNo % 15 === 0) syncPlayer();
+  if (++frameNo % 15 === 0) { syncPlayer(); tabStatus(t); }
 }
 
 setScene(0, 0);
