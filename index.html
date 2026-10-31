@@ -73,6 +73,7 @@
   #list[data-frame=stream] { background: #120a22; border-color: #e23bff; box-shadow: 0 0 20px #e23bff, 0 0 44px rgba(90,240,255,.45); }
   #list[data-frame=stream] .bar { background: linear-gradient(90deg, #e23bff, #5af0ff); color: #120a22; }
   #list[data-frame=stream] .bar span { background: none; }
+  body.no-video #list { display: none; }
   body.dragging iframe { pointer-events: none; }
   #main { left: 16px; top: 16px; z-index: 2; }
   #list { left: 16px; top: 236px; z-index: 2; }
@@ -173,8 +174,11 @@
   <div class="bar" data-drag><span>MENU</span><button data-click="menuBtn" title="Close the menu">X</button></div>
   <div class="grip" data-size="menu" title="Drag to resize"></div>
   <div class="row">
-    <button id="srcTab" class="grow" title="Makes the visuals follow this tab's sound">REACT TO TAB AUDIO</button>
+    <button id="srcTab" class="grow" title="Makes the visuals follow the video playing here">REACT TO THIS TAB</button>
     <span id="tabStatus">OFF</span>
+  </div>
+  <div class="row">
+    <button id="srcOther" class="grow" title="Makes the visuals follow another tab, and removes the video here">LISTEN TO ANOTHER TAB</button>
   </div>
   <div class="row">
     <button id="shuffleSpooky" class="grow" data-mode="spooky" title="Random Halloween scenes (S)">SPOOKY SCARY SHUFFLE</button>
@@ -246,20 +250,26 @@ function stopTab() {
   A.stream = A.src = A.analyser = null;
   A.live = false;
   $('srcTab').classList.remove('on');
+  $('srcOther').classList.remove('on');
+  document.body.classList.remove('no-video');
 }
 
-async function useTab() {
+async function useTab(other) {
   if (A.stream) { stopTab(); return note('Tab audio off. The visuals are back on their built-in pulse.'); }
   if (!navigator.mediaDevices?.getDisplayMedia) return note('This browser cannot share tab audio. Use Chrome or Edge on a computer.', true);
   // Started inside the click: once the popup has closed, Chrome can refuse to start it.
   A.ctx ||= new (window.AudioContext || window.webkitAudioContext)();
   A.ctx.resume();
   try {
-    note('In the popup, share this tab and switch on "Also share tab audio".');
+    note(other ? 'In the popup, pick the tab with the music and switch on "Also share tab audio".' : 'In the popup, share this tab and switch on "Also share tab audio".');
+    // Chrome normally jumps to the shared tab, and the visuals stop when this tab is hidden.
+    const controller = other && window.CaptureController ? new CaptureController() : null;
+    try { controller?.setFocusBehavior('no-focus-change'); } catch {}
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { frameRate: 1, width: 320 },
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
-      preferCurrentTab: true, systemAudio: 'include',
+      systemAudio: 'include',
+      ...(other ? { selfBrowserSurface: 'exclude', ...(controller ? { controller } : {}) } : { preferCurrentTab: true }),
     });
     if (!stream.getAudioTracks().length) {
       stream.getTracks().forEach(tr => tr.stop());
@@ -278,12 +288,17 @@ async function useTab() {
     stream.getAudioTracks().forEach(tr => tr.onended = () => {
       if (A.stream !== stream) return;
       stopTab();
-      note('Sharing stopped. Press REACT TO TAB AUDIO to reconnect.', true);
+      note('Sharing stopped. The video is back.', true);
     });
-    $('srcTab').classList.add('on');
+    $(other ? 'srcOther' : 'srcTab').classList.add('on');
+    if (other) {
+      // YouTube's rules: nothing plays from a player that isn't on screen.
+      if (yt.ready) yt.player.pauseVideo();
+      document.body.classList.add('no-video');
+    }
     note('Connected. Press play and watch the status next to the button.');
   } catch (err) {
-    note(err.name === 'NotAllowedError' ? 'Sharing was cancelled. Press REACT TO TAB AUDIO to try again.' : `Tab audio failed: ${err.message}`, true);
+    note(err.name === 'NotAllowedError' ? 'Sharing was cancelled. Press the button to try again.' : `Tab audio failed: ${err.message}`, true);
   }
 }
 
@@ -1940,7 +1955,7 @@ function syncPlayer() {
 }
 
 /* ---------- controls ---------- */
-const act = fn => () => yt.ready && fn(yt.player);
+const act = fn => () => yt.ready && !document.body.classList.contains('no-video') && fn(yt.player);
 $('prev').onclick = act(p => p.previousVideo());
 $('next').onclick = act(p => p.nextVideo());
 $('play').onclick = act(p => p.playVideo());
@@ -2053,7 +2068,8 @@ const pickScene = i => { setShuffle(''); setScene(i, performance.now() / 1000); 
 const nextClassic = () => { setShuffle(''); classic + 1 < CLASSICS.length ? setClassic(classic + 1) : setScene(sceneIx, performance.now() / 1000); };
 const toggleShuffle = mode => setShuffle(shuffleMode === mode ? '' : mode);
 document.querySelectorAll('[data-mode]').forEach(b => { b.onclick = () => toggleShuffle(b.dataset.mode); });
-$('srcTab').onclick = useTab;
+$('srcTab').onclick = () => useTab(false);
+$('srcOther').onclick = () => useTab(true);
 CLASSICS.forEach(([name, , group], i) => {
   const b = document.createElement('button');
   b.textContent = name;
