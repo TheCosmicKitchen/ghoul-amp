@@ -3676,7 +3676,7 @@ const T_REGIONS = {
   CITY: { far: [90, 90, 120], mid: [62, 62, 92], near: [46, 46, 66], ground: [52, 50, 60] },
   SNOWFIELDS: { far: [190, 204, 224], mid: [216, 226, 238], near: [236, 242, 248], ground: [224, 232, 240] },
 };
-const T = { ready: false, S: 0, sp: 0, leg: 0, stop: 8, at: 0, line: [], region: 'FARMLAND', nextRegion: 'FOREST', tunnel: 0, swapped: true, km: 0, stops: 0, passengers: [], forcePhase: null, rain: false, news: '', newsAt: -99, nextNews: 6, banner: null, saveAt: 0, conductor: -99, t: 0 };
+const T = { ready: false, S: 0, sp: 1, leg: 20, stop: 0, at: 0, line: [], region: 'FARMLAND', nextRegion: 'FOREST', tunnel: 0, swapped: true, km: 0, stops: 0, passengers: [], forcePhase: null, rain: false, news: '', newsAt: -99, nextNews: 6, banner: null, saveAt: 0, conductor: -99, t: 0 };
 const tHash = (i, k = 0) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
 const tMix = (a, b, m) => a.map((v, i) => v + (b[i] - v) * m);
 const tRgb = c3 => `rgb(${c3.map(Math.round).join()})`;
