@@ -558,6 +558,16 @@ const CHAT_BNF = String.raw`
 <bg_ev_reshape> ::= the map has been redrawn by a committee of moths.
 <bg_ev_units> ::= scoring has moved to a new currency.
 <bg_end> ::= everyone has won, except the board | the winner is the small bishop | the game has ended, or has it | nobody won. everyone is now a duke | final score: yes
+<vw_fac> ::= <vw_a> <vw_b> | <vw_b> 95 | <vw_a> <vw_b> 2000 | new <vw_a> <vw_b>
+<vw_a> ::= Sunset | Chrome | Pacific | Marble | Neon | Crystal | Velvet | Dream | Digital | Lagoon
+<vw_b> ::= Plaza | Syndicate | Mall Corp | Holdings | Resort | Collective | Dynasty | Consortium
+<vw_unit> ::= <vw_u_a> <vw_u_b>
+<vw_u_a> ::= Chrome | Marble | Virtual | Lucid | Hyper | Soft | Pastel | Liquid | Holo | Silk
+<vw_u_b> ::= Dolphin | Apostle | Lancer | Courier | Sentinel | Bishop | Surfer | Cherub | Hoplite | Salesman
+<vw_bld> ::= <vw_u_a> <vw_bn>
+<vw_bn> ::= Atrium | Food Court | Terminal | Fountain | Arcade | Temple | Kiosk | Escalator
+<vw_attack> ::= {fac} sends the army to the food court | {fac} advances, smooth and unhurried | {fac} has entered a new fiscal aesthetic | {fac} attacks with tasteful lighting
+<vw_log> ::= {unit} units report excellent ambience | {fac} stock is up 0.4 percent | {fac} has opened a second fountain | {unit} morale is pastel | please enjoy the sunset while you are defeated | now playing: elevator music for the fallen | {fac} thanks you for shopping at war
 <album> ::= <al_a> <al_b> | the <al_b> tapes | <al_b> for <al_c> | <al_a> <al_b>, vol. 2
 <al_a> ::= slow | sunday | velvet | soft | midnight | rainy | paper | quiet
 <al_b> ::= kettles | motels | satellites | gardens | postcards | moths | radiators | lanterns
@@ -5680,6 +5690,260 @@ function drawObservatory(t, dt) {
 }
 function vTreeNight(x, y, h, col) { vR(col, x - 2, y - h * .4, 4, h * .4 + 4); qOval(x, y - h * .7, h * .5, h * .5, col); qOval(x - h * .3, y - h * .45, h * .34, h * .34, col); qOval(x + h * .3, y - h * .5, h * .34, h * .34, col); }
 
+/* VAPOR WARS: the computer plays both sides of an RTS with freshly generated armies. */
+const VW_SAVE = 'winvamp.vapor';
+const VW_BODIES = ['bust', 'dolphin', 'drone', 'cube', 'pyramid', 'floppy', 'cassette', 'column', 'palm', 'orb'];
+const VW_PALS = [['#30f0e8', '#1080c0'], ['#ff5ac8', '#a02090'], ['#ffd060', '#e07020'], ['#a080ff', '#5030c0'], ['#70ffb0', '#209070'], ['#ff8080', '#c03060']];
+const VW_ROOFS = ['pyramid', 'dome', 'antenna', 'disc', 'columns'];
+const VW_SLOTS = [[62, 70], [62, 138], [26, 62], [26, 148], [88, 104]];
+const VW = { ready: false, sides: [], ore: [], shots: [], bursts: [], match: 0, wins: {}, clock: 0, end: null, news: '', nextNews: 8, card: 0, t: 0, saveAt: 0, totalWins: [0, 0] };
+const vwScale = y => .72 + (y - 40) / 140 * .62;
+
+function vwType() {
+  const hp = Math.round(rnd(30, 120)), dmg = Math.round(rnd(4, 16)), melee = Math.random() < .3, range = melee ? 12 : Math.round(rnd(36, 80)), sp = Math.round(rnd(11, 27)), rate = +rnd(.7, 1.6).toFixed(2);
+  return { name: chatExpand('vw_unit').toUpperCase(), body: VW_BODIES[Math.floor(rnd(0, VW_BODIES.length))], hp, dmg, range, sp, rate, cost: Math.round((hp * .4 + dmg * 2.4 + range * .25 + sp * .5) / 5) * 5, size: 5 + Math.round(hp / 30), shot: ['laser', 'disc', 'beam'][Math.floor(rnd(0, 3))] };
+}
+function vwShape() {
+  return { floors: 1 + Math.floor(rnd(0, 3)), w: Math.round(rnd(16, 24)), roof: VW_ROOFS[Math.floor(rnd(0, VW_ROOFS.length))], glass: Math.random() < .5 };
+}
+function vwBuilding(s, kind, slot, name, extra = {}) {
+  const dir = s.dir, x = dir > 0 ? slot[0] : 320 - slot[0], hp = kind === 'hq' ? 700 : kind === 'turret' ? 260 : 340;
+  return { kind, x, y: slot[1], hp, max: hp, name, side: s.i, grow: kind === 'hq' ? 1 : 0, shape: vwShape(), cool: rnd(0, 3), big: kind === 'hq', ...extra };
+}
+
+function vwNew(t) {
+  VW.match++; VW.clock = 0; VW.end = null; VW.shots = []; VW.bursts = []; VW.card = t + 8;
+  const pals = [...VW_PALS].sort(() => Math.random() - .5);
+  VW.sides = [0, 1].map(i => {
+    const s = { i, dir: i ? -1 : 1, name: chatExpand('vw_fac').toUpperCase(), pal: pals[i], money: 170, units: [], workers: [], builds: [], types: [vwType(), vwType(), vwType()], wave: 5, attack: false, plan: 0, kills: 0 };
+    s.builds.push(vwBuilding(s, 'hq', [28, 104], `${s.name} HQ`));
+    s.plan = 0;
+    s.queue = [...s.types.map((u, k) => ({ kind: 'factory', type: k, name: chatExpand('vw_bld').toUpperCase(), cost: 120 + k * 40 })), { kind: 'turret', name: 'TURRET', cost: 130 }, { kind: 'turret', name: 'TURRET', cost: 130 }];
+    return s;
+  });
+  VW.ore = [[112, 72], [112, 136], [208, 72], [208, 136], [160, 104], [160, 54], [160, 156]].map(([x, y]) => ({ x, y, left: 500 }));
+  VW.news = `Match ${VW.match}: ${VW.sides[0].name} vs ${VW.sides[1].name}.`; VW.nextNews = t + 9;
+}
+function vwStart(t) {
+  let saved = null;
+  try { saved = JSON.parse(store.get(VW_SAVE) || 'null'); } catch {}
+  VW.match = saved?.match || 0; VW.totalWins = saved?.wins || [0, 0];
+  VW.ready = true; vwNew(t);
+}
+function vwAll(s) { return [...s.units, ...s.workers, ...s.builds]; }
+function vwBurst(x, y, cols, n) {
+  if (VW.bursts.length > 240) return;
+  for (let i = 0; i < n; i++) { const a = rnd(0, 7), v = rnd(10, 46); VW.bursts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 8, life: 1, col: cols[i % cols.length] }); }
+}
+function vwHit(from, tgt, dmg, type, col, t) {
+  tgt.hp -= dmg;
+  VW.shots.push({ x0: from.x, y0: from.y - 5, x1: tgt.x, y1: tgt.y - 4, life: 1, type, col });
+  if (VW.shots.length > 90) VW.shots.shift();
+}
+function vwMove(u, x, y, sp, dt) {
+  const d = Math.hypot(x - u.x, y - u.y) || 1, step = Math.min(d, sp * dt);
+  u.x += (x - u.x) / d * step; u.y = clamp(u.y + (y - u.y) / d * step, 46, 170); u.flip = x < u.x;
+  return d <= step + .5;
+}
+
+function vwUpdate(t, dt) {
+  VW.t = t;
+  if (!VW.ready) vwStart(t);
+  if (VW.end) { if (t > VW.end.next) vwNew(t); vwParticles(dt); return; }
+  VW.clock += dt;
+  const sudden = VW.clock > 260;
+  for (const s of VW.sides) {
+    const foe = VW.sides[1 - s.i], hq = s.builds.find(b => b.kind === 'hq');
+    if (!hq) continue;
+    if (sudden) hq.hp -= dt * 14;
+    s.money += dt * 2.5;
+    const want = s.queue[0];
+    if (want && s.money >= want.cost && s.builds.every(b => b.grow >= 1)) {
+      s.money -= want.cost; s.queue.shift();
+      s.builds.push(vwBuilding(s, want.kind, VW_SLOTS[s.plan++ % VW_SLOTS.length], want.name, { type: want.type }));
+    }
+    hq.cool -= dt;
+    if (s.workers.length < 5 && s.money >= 40 && hq.cool <= 0) { s.money -= 40; hq.cool = 4; s.workers.push({ x: hq.x + s.dir * 12, y: hq.y, hp: 25, max: 25, state: 'go', load: 0, node: null, side: s.i, ph: rnd(0, 7) }); }
+    for (const b of s.builds) {
+      if (b.grow < 1) { b.grow = Math.min(1, b.grow + dt / 10); if (b.grow === 1 && b.kind === 'factory') VW.news = `${s.name} opens the ${b.name}.`; continue; }
+      b.cool -= dt;
+      if (b.kind === 'factory' && b.cool <= 0 && s.units.length < 22) {
+        const ty = s.types[b.type];
+        if (s.money >= ty.cost && (!s.queue.length || s.money > s.queue[0].cost * .5)) { s.money -= ty.cost; b.cool = 3 + ty.cost / 40; s.units.push({ x: b.x + s.dir * 14, y: b.y + rnd(-5, 5), hp: ty.hp, max: ty.hp, ty, cool: 0, side: s.i, ph: rnd(0, 7), oy: rnd(-34, 34) }); }
+      }
+      if (b.kind === 'turret' && b.cool <= 0) {
+        const tgt = vwAll(foe).filter(e => Math.hypot(e.x - b.x, e.y - b.y) < 78).sort((p, q) => Math.hypot(p.x - b.x, p.y - b.y) - Math.hypot(q.x - b.x, q.y - b.y))[0];
+        if (tgt) { vwHit(b, tgt, 10, 'beam', s.pal[0], t); b.cool = 1.1; }
+      }
+    }
+    for (const w of s.workers) {
+      if (w.state === 'go') {
+        if (!w.node || w.node.left <= 0) w.node = VW.ore.filter(o => o.left > 0).sort((a, b) => Math.hypot(a.x - w.x, a.y - w.y) - Math.hypot(b.x - w.x, b.y - w.y))[0];
+        if (!w.node) continue;
+        if (vwMove(w, w.node.x, w.node.y, 20, dt)) { w.state = 'mine'; w.until = t + 2.2; }
+      } else if (w.state === 'mine') { if (t > w.until) { w.load = Math.min(25, w.node?.left ?? 0); if (w.node) w.node.left -= w.load; w.state = 'back'; } }
+      else if (vwMove(w, hq.x + s.dir * 10, hq.y, 20, dt)) { s.money += w.load; w.load = 0; w.state = 'go'; }
+    }
+    if (!s.attack && (s.units.length >= s.wave || sudden)) { s.attack = true; s.wave = Math.min(16, s.wave + 2); VW.news = cozyLine('vw_attack', { fac: s.name }); VW.nextNews = t + 12; }
+    if (s.attack && s.units.length < 2 && !sudden) s.attack = false;
+    const goal = foe.builds.reduce((best, b) => (Math.abs(b.x - hq.x) < Math.abs((best?.x ?? 999) - hq.x) ? b : best), null);
+    for (const u of s.units) {
+      const ty = u.ty, all = vwAll(foe);
+      let near = null, best = 74;
+      for (const e of all) { const d = Math.hypot(e.x - u.x, e.y - u.y); if (d < best) { best = d; near = e; } }
+      u.cool -= dt;
+      if (near && best <= ty.range + (near.grow !== undefined ? 8 : 0)) {
+        if (u.cool <= 0) { vwHit(u, near, ty.dmg, ty.shot, s.pal[0], t); u.cool = ty.rate; }
+      } else if (near) vwMove(u, near.x, near.y, ty.sp, dt);
+      else if (s.attack && goal) vwMove(u, goal.x, goal.y + u.oy * .4, ty.sp, dt);
+      else vwMove(u, hq.x + s.dir * 92, hq.y + u.oy, ty.sp, dt);
+    }
+  }
+  for (const s of VW.sides) {
+    for (const list of [s.units, s.workers, s.builds]) for (let i = list.length - 1; i >= 0; i--) if (list[i].hp <= 0) {
+      const dead = list[i], foe = VW.sides[1 - s.i];
+      vwBurst(dead.x, dead.y - 5, s.pal, dead.grow !== undefined ? 40 : 12);
+      foe.kills++;
+      if (dead.kind && dead.kind !== 'hq') VW.news = `The ${dead.name} has been demolished. Very tasteful.`;
+      list.splice(i, 1);
+      if (dead.kind === 'hq') {
+        VW.totalWins[foe.i]++;
+        VW.end = { winner: foe, next: t + 7 };
+        vwBurst(dead.x, dead.y - 8, [...s.pal, '#fff'], 90);
+        store.set(VW_SAVE, JSON.stringify({ match: VW.match, wins: VW.totalWins }));
+      }
+    }
+  }
+  vwParticles(dt);
+}
+function vwParticles(dt) {
+  for (const b of VW.bursts) { b.x += b.vx * dt; b.y += b.vy * dt; b.vy += 30 * dt; b.life -= dt * 1.2; }
+  VW.bursts = VW.bursts.filter(b => b.life > 0);
+  for (const b of VW.shots) b.life -= dt * 4;
+  VW.shots = VW.shots.filter(b => b.life > 0);
+}
+
+function vwBody(ty, x, y, s, a, b, t, flip) {
+  const z = ty.size * s, d = flip ? -1 : 1, r = (col, px, py, w, h) => vR(col, x + px * z, y + py * z, Math.max(1, w * z), Math.max(1, h * z)), marble = '#ece6f4';
+  switch (ty.body) {
+    case 'bust': r(b, -.5, -.3, 1, .3); r(marble, -.42, -.75, .84, .5); r(marble, -.24, -1.45, .5, .72); r('#b8b0c8', .08 * d, -1.2, .14, .14); r(a, -.3, -1.55, .58, .18); break;
+    case 'dolphin': { const h = Math.sin(t * 5 + x) * .18; qOval(x, y - z * (.8 + h), z * .8, z * .32, a); qPoly([[x - d * z * .1, y - z * (1.05 + h)], [x + d * z * .25, y - z * (1.45 + h)], [x + d * z * .35, y - z * (1 + h)]], b); qPoly([[x - d * z * .7, y - z * (.8 + h)], [x - d * z * 1.1, y - z * (1.1 + h)], [x - d * z * 1.1, y - z * (.5 + h)]], b); r('#fff', .5 * d, -.9 - h, .1, .1); break; }
+    case 'drone': { const h = Math.sin(t * 4 + x) * .1; r(a, -.55, -1.1 - h, 1.1, .3); r(b, -.25, -.85 - h, .5, .3); r('#fff', -.08, -.78 - h, .16, .14); r('#e8e8f8', -.9 * (Math.sin(t * 30) > 0 ? 1 : .6), -1.22 - h, 1.8 * (Math.sin(t * 30) > 0 ? 1 : .6), .08); break; }
+    case 'cube': { const q = t * 1.6 + x, cx = Math.cos(q) * .25, sx = Math.sin(q) * .25; qPoly([[x - z * .5, y - z * .7], [x + cx * z, y - z * (1.1 + sx * .2)], [x + z * .5, y - z * .7], [x, y - z * .3]], a); qPoly([[x - z * .5, y - z * .7], [x, y - z * .3], [x, y], [x - z * .5, y - z * .35]], b); qPoly([[x + z * .5, y - z * .7], [x, y - z * .3], [x, y], [x + z * .5, y - z * .35]], tRgb(tMix(tHex(a), [0, 0, 0], .25))); break; }
+    case 'pyramid': qPoly([[x - z * .6, y], [x, y - z * 1.25], [x + z * .1, y]], a); qPoly([[x + z * .1, y], [x, y - z * 1.25], [x + z * .6, y]], b); r('#fff', -.05, -1.32 + Math.sin(t * 3 + x) * .06, .12, .12); break;
+    case 'floppy': r(a, -.5, -1.05, 1, 1); r('#e8e8f0', -.3, -1.05, .6, .34); r(b, .1, -1.05, .14, .3); r('#f8f8ff', -.34, -.55, .68, .46); r(b, -.26, -.42, .5, .06); break;
+    case 'cassette': r(a, -.62, -.85, 1.24, .78); r('#f8f8ff', -.5, -.76, 1, .4); r('#14141c', -.3, -.6, .18, .18); r('#14141c', .12, -.6, .18, .18); r(b, -.3, -.28, .6, .2); break;
+    case 'column': r(marble, -.42, -1.45, .84, .16); r(marble, -.3, -1.3, .6, 1.1); for (const k of [-.18, 0, .18]) r('#b8b0c8', k, -1.28, .06, 1.05); r(marble, -.44, -.2, .88, .2); r(a, -.3, -1.6, .6, .12); break;
+    case 'palm': { const w = Math.sin(t * 2 + x) * .1; r('#8a5a6a', -.08, -1.3, .16, 1.3); for (let i = 0; i < 5; i++) { const q = i / 4 * Math.PI, ex = x + Math.cos(q) * z * .75 + w * z, ey = y - z * 1.3 - Math.sin(q) * z * .3; qc.strokeStyle = i % 2 ? a : b; qc.lineWidth = Math.max(1, z * .12); qc.beginPath(); qc.moveTo(x, y - z * 1.3); qc.quadraticCurveTo((x + ex) / 2, y - z * 1.65, ex, ey + z * .15); qc.stroke(); } const st = Math.sin(t * 9 + x) > 0 ? .12 : -.12; r(b, -.25 + st, -.1, .16, .1); r(b, .1 - st, -.1, .16, .1); break; }
+    default: { const h = Math.sin(t * 3 + x) * .12; qOval(x, y - z * (.8 + h), z * .5, z * .5, a); qOval(x - z * .14, y - z * (.94 + h), z * .16, z * .16, '#fff'); qc.strokeStyle = b; qc.lineWidth = 1; qc.beginPath(); qc.ellipse(x, y - z * (.8 + h), z * .8, z * .2, -.3, 0, 7); qc.stroke(); }
+  }
+}
+
+function vwBuildDraw(bd, s, t) {
+  const v = vwScale(bd.y), [a, b] = s.pal, sh = bd.shape, x = Math.round(bd.x), y = Math.round(bd.y), big = bd.big ? 1.45 : bd.kind === 'turret' ? .7 : 1, w = sh.w * v * big, fh = 12 * v * big, h = sh.floors * fh, grow = bd.grow;
+  vR('rgba(0,0,0,.35)', x - w / 2 - 2, y, w + 6, 3);
+  qc.save(); qc.beginPath(); qc.rect(x - 40, y - (h + 30 * v) * grow - 1, 80, (h + 30 * v) * grow + 6); qc.clip();
+  for (let f = 0; f < sh.floors; f++) {
+    const fw = w * (1 - f * .16), fy = y - fh * (f + 1);
+    vR(sh.glass ? tRgb(tMix(tHex(b), [10, 8, 40], .45)) : '#d8d0e4', x - fw / 2, fy, fw, fh);
+    vR(a, x - fw / 2, fy, fw, 1); vR(tRgb(tMix(tHex(b), [0, 0, 0], .3)), x + fw / 2 - 2, fy, 2, fh);
+    for (let i = 0; i < 3; i++) vR(Math.sin(t * 2 + i + f + x) > -.5 ? a : '#2a1a5a', x - fw / 2 + 2 + i * (fw - 4) / 3, fy + 3, Math.max(1, fw / 6), Math.max(2, fh * .45));
+  }
+  const ty = y - h, tw = w * (1 - (sh.floors - 1) * .16);
+  if (bd.kind === 'turret') { vR('#e8e8f8', x - 1, ty - 8, 3, 8); qOval(x, ty - 8, 4, 3, a); }
+  else if (sh.roof === 'pyramid') qPoly([[x - tw / 2, ty], [x, ty - 14 * v * big], [x + tw / 2, ty]], a);
+  else if (sh.roof === 'dome') { qc.fillStyle = a; qc.beginPath(); qc.arc(x, ty, tw * .36, Math.PI, 0); qc.fill(); }
+  else if (sh.roof === 'antenna') { vR('#e8e8f8', x, ty - 16 * v, 1, 16 * v); if (Math.sin(t * 5 + x) > 0) vR('#ff4a4a', x - 1, ty - 18 * v, 3, 3); }
+  else if (sh.roof === 'disc') { vR('#e8e8f8', x, ty - 7 * v, 1, 7 * v); qOval(x, ty - 10 * v, tw * .4, 4 * v, a); }
+  else for (const k of [-.4, -.13, .13, .4]) { vR('#ece6f4', x + k * tw - 1, ty - 11 * v, 3, 11 * v); vR('#ece6f4', x - tw / 2, ty - 13 * v, tw, 2); }
+  qc.restore();
+  if (bd.hp < bd.max) { vR('#1a0a3a', x - 10, y + 3, 20, 2); vR(bd.hp / bd.max < .3 ? '#ff4a6a' : a, x - 10, y + 3, 20 * clamp(bd.hp / bd.max), 2); }
+  if (grow < 1) { vR(a, x - 12, y - 3, 24 * grow, 1); for (let i = 0; i < 4; i++) vR('#fff', x - 10 + (t * 20 + i * 6) % 20, y - (h * grow) - 2, 1, 2); }
+}
+
+function drawVapor(t, dt) {
+  vwUpdate(t, dt);
+  const sky = qc.createLinearGradient(0, 0, 0, 46);
+  sky.addColorStop(0, '#1a0a52'); sky.addColorStop(.55, '#a0208c'); sky.addColorStop(1, '#ff7a70');
+  qc.fillStyle = sky; qc.fillRect(0, 0, QW, 46);
+  for (let i = 0; i < 40; i++) { qc.globalAlpha = .4 + .6 * Math.abs(Math.sin(t * .7 + i)); vR('#fff', (i * 37.3) % QW, (i * 7.7) % 18, 1, 1); } qc.globalAlpha = 1;
+  qc.save(); qc.beginPath(); qc.arc(160, 40, 30, 0, 7); qc.clip();
+  const sun = qc.createLinearGradient(0, 10, 0, 46); sun.addColorStop(0, '#ffe870'); sun.addColorStop(1, '#ff3a9a');
+  qc.fillStyle = sun; qc.fillRect(120, 8, 80, 40);
+  for (let i = 0; i < 5; i++) { const y = 20 + ((i * 6 + t * 3) % 26); vR('#7a1a7a', 120, y, 80, 1 + (y - 20) / 9); }
+  qc.restore();
+  qc.strokeStyle = '#30f0e8'; qc.lineWidth = 1; qc.beginPath();
+  for (let x = 0; x <= QW; x += 6) { const h = 46 - Math.abs(Math.sin(x * .021) * 16) * (Math.abs(x - 160) > 40 ? 1 : .15) - Math.abs(Math.sin(x * .067)) * 5; x ? qc.lineTo(x, h) : qc.moveTo(x, h); } qc.stroke();
+  const floor = qc.createLinearGradient(0, 46, 0, 180);
+  floor.addColorStop(0, '#2a0a5a'); floor.addColorStop(1, '#0c0626');
+  qc.fillStyle = floor; qc.fillRect(0, 46, QW, 134);
+  const pulse = .35 + A.pulse * .3;
+  qc.strokeStyle = `rgba(255,70,200,${pulse})`; qc.lineWidth = 1; qc.beginPath();
+  for (let i = -14; i <= 14; i++) { qc.moveTo(160 + i * 12, 46); qc.lineTo(160 + i * 62, 180); }
+  for (let i = 0; i < 11; i++) { const y = 46 + 134 * ((i + (t * .25) % 1) / 11) ** 1.9; qc.moveTo(0, y); qc.lineTo(QW, y); }
+  qc.stroke();
+  for (const [x, y, s] of [[10, 52, 1], [310, 52, 1], [146, 48, .55], [176, 48, .55]]) { vR('#26104a', x, y - 22 * s, 2, 22 * s); for (let i = 0; i < 5; i++) { const q = i / 4 * Math.PI; qc.strokeStyle = '#26104a'; qc.lineWidth = 2; qc.beginPath(); qc.moveTo(x, y - 22 * s); qc.lineTo(x + Math.cos(q) * 13 * s, y - 22 * s - Math.sin(q) * 5 * s + 5 * s); qc.stroke(); } }
+  for (const o of VW.ore) if (o.left > 0) {
+    const v = vwScale(o.y), n = Math.ceil(o.left / 120);
+    for (let i = 0; i < n; i++) { const ox = o.x + Math.cos(i * 2.4) * 7 * v, oy = o.y + Math.sin(i * 2.4) * 3, h = 5 + Math.sin(t * 2 + i) * 1; qPoly([[ox - 3, oy], [ox, oy - h * v * 1.5], [ox + 3, oy], [ox, oy + 2]], i % 2 ? '#ffe870' : '#ffb0e0'); }
+  }
+  const items = [];
+  VW.sides.forEach(s => {
+    s.builds.forEach(b => items.push([b.y, () => vwBuildDraw(b, s, t)]));
+    s.workers.forEach(w => items.push([w.y, () => { const v = vwScale(w.y), x = Math.round(w.x), y = Math.round(w.y); vR('rgba(0,0,0,.3)', x - 3, y, 7, 1); qPoly([[x, y - 8 * v], [x + 3 * v, y - 4 * v], [x, y], [x - 3 * v, y - 4 * v]], s.pal[0]); if (w.load) vR('#ffe870', x - 1, y - 11 * v, 3, 3); }]));
+    s.units.forEach(u => items.push([u.y, () => {
+      const v = vwScale(u.y), x = Math.round(u.x), y = Math.round(u.y + Math.sin(t * 3 + u.ph) * .4);
+      vR('rgba(0,0,0,.3)', x - u.ty.size * v * .6, y, u.ty.size * v * 1.2, 1);
+      vwBody(u.ty, x, y, v, s.pal[0], s.pal[1], t, s.dir < 0);
+      if (u.hp < u.max) { vR('#1a0a3a', x - 5, y + 2, 10, 1); vR(s.pal[0], x - 5, y + 2, 10 * clamp(u.hp / u.max), 1); }
+    }]));
+  });
+  items.sort((a, b) => a[0] - b[0]).forEach(i => i[1]());
+  if (SHOW.effects) {
+    for (const sh of VW.shots) {
+      qc.globalAlpha = sh.life;
+      if (sh.type === 'disc') { const q = 1 - sh.life; qOval(sh.x0 + (sh.x1 - sh.x0) * q, sh.y0 + (sh.y1 - sh.y0) * q, 3, 1.5, sh.col); }
+      else { qc.strokeStyle = sh.col; qc.lineWidth = sh.type === 'beam' ? 2 : 1; qc.beginPath(); qc.moveTo(sh.x0, sh.y0); qc.lineTo(sh.x1, sh.y1); qc.stroke(); }
+    }
+    qc.globalAlpha = 1;
+    for (const b of VW.bursts) { qc.globalAlpha = clamp(b.life * 1.5); vR(b.col, b.x, b.y, 2, 2); } qc.globalAlpha = 1;
+    for (let i = 0; i < 12; i++) if (Math.sin(t * .9 + i * 2) > .4) vR('#fff', (i * 53 + t * 5) % QW, 50 + (i * 31) % 120, 1, 1);
+  }
+  const ui = cozyPresent(), { P, ox, oy, text } = ui;
+  const panel = (x, y, w, h, col = '#ff5ac8') => { c.fillStyle = 'rgba(16,6,48,.86)'; c.fillRect(ox + P(x), oy + P(y), P(w), P(h)); c.strokeStyle = col; c.lineWidth = P(.7); c.strokeRect(ox + P(x), oy + P(y), P(w), P(h)); };
+  if (SHOW.stats) VW.sides.forEach((s, i) => {
+    const x = i ? 215 : 3, army = s.units.length, hq = s.builds.find(b => b.kind === 'hq');
+    panel(x, 3, 102, 21, s.pal[0]);
+    text(s.name, x + 3, 9.5, Math.min(6.4, 96 / (s.name.length * .46)), s.pal[0]);
+    text(`${Math.floor(s.money)} CR  ${army} UNITS  ${s.workers.length} BOTS  ${s.builds.length} BLDG`, x + 3, 15.5, 5, '#e8e0ff');
+    c.fillStyle = '#2a1a5a'; c.fillRect(ox + P(x + 3), oy + P(18.5), P(96), P(3));
+    c.fillStyle = s.pal[0]; c.fillRect(ox + P(x + 3), oy + P(18.5), P(96 * clamp((hq?.hp ?? 0) / 700)), P(3));
+  });
+  text(`V A P O R   W A R S   M A T C H  ${VW.match}`, 160, 8, 6, '#ffe870', 'center');
+  text(`${Math.floor(VW.clock / 60)}:${String(Math.floor(VW.clock % 60)).padStart(2, '0')}`, 160, 15, 6, '#2a0a5a', 'center');
+  if (SHOW.banners && t < VW.card && !VW.end) {
+    const fade = clamp(Math.min((t - (VW.card - 8)) * 3, (VW.card - t) * 2));
+    c.globalAlpha = fade;
+    VW.sides.forEach((s, i) => {
+      const x = i ? 164 : 16;
+      panel(x, 56, 140, 50, s.pal[0]);
+      text(s.name, x + 70, 64, Math.min(7, 130 / (s.name.length * .46)), s.pal[0], 'center');
+      s.types.forEach((u, k) => { text(u.name, x + 5, 73 + k * 11, 6.2, '#fff'); text(`HP ${u.hp}  DMG ${u.dmg}  RNG ${u.range}  $${u.cost}`, x + 5, 78 + k * 11, 5, '#b8a8e8'); });
+    });
+    c.globalAlpha = 1;
+  }
+  if (VW.end) {
+    const age = t - (VW.end.next - 7), s = VW.end.winner;
+    c.globalAlpha = clamp(age * 2);
+    panel(76, 74, 168, 30, s.pal[0]);
+    text('V I C T O R Y', 160, 84, 8, '#ffe870', 'center');
+    text(s.name, 160, 95, Math.min(8, 156 / (s.name.length * .46)), s.pal[0], 'center');
+    c.globalAlpha = 1;
+  }
+  if (t > VW.nextNews && !VW.end) { const s = VW.sides[Math.floor(rnd(0, 2))]; VW.news = cozyLine('vw_log', { fac: s.name, unit: s.types[Math.floor(rnd(0, 3))].name }); VW.nextNews = t + rnd(11, 17); }
+  if (SHOW.log && VW.news) { panel(3, QH - 14, 314, 11); text(VW.news, 8, QH - 6.5, 7, '#7dffe8'); }
+}
+
 const CLASSICS = [
   ['SWIRL', drawSwirl, 'classics'], ['BARS', drawSpectrum, 'classics'], ['PLASMA', drawPlasma, 'classics'], ['KALEIDO', drawKaleido, 'classics'], ['SCOPE', drawScope, 'classics'],
   ['BATTERY', drawBattery, 'wmp9'], ['ALCHEMY', drawAlchemy, 'wmp9'], ['AMBIENCE', drawAmbience, 'wmp9'], ['FIRE', drawFirestorm, 'wmp9'], ['MIST', drawMist, 'wmp9'],
@@ -5688,7 +5952,7 @@ const CLASSICS = [
   ['LAVA', drawLava, 'chill'], ['KOI', drawKoi, 'chill'], ['PEAKS', drawPeaks, 'chill'], ['STARS', drawStarry, 'chill'],
   ['8-BIT QUEST', drawQuest, 'chill'], ['POCKET VILLAGE', drawVillage, 'chill'], ['NIGHT TRAIN', drawTrain, 'chill'], ['ALMANAC FARM', drawFarm, 'chill'],
   ['LONG SAIL', drawSail, 'chill'], ['REEF TANK', drawReef, 'chill'], ['CORNER CAFE', drawCafe, 'chill'], ['THE GAME', drawBoardGame, 'chill'],
-  ['LO-FI ROOM', drawRoom, 'chill'], ['LONG TRAIL', drawTrail, 'chill'], ['TERRARIUM', drawTerrarium, 'chill'], ['OBSERVATORY', drawObservatory, 'chill'],
+  ['LO-FI ROOM', drawRoom, 'chill'], ['LONG TRAIL', drawTrail, 'chill'], ['TERRARIUM', drawTerrarium, 'chill'], ['OBSERVATORY', drawObservatory, 'chill'], ['VAPOR WARS', drawVapor, 'chill'],
 ];
 
 // Each shuffle plays everything once before repeating.
@@ -5973,16 +6237,17 @@ if (startMode.has('sail')) setClassic(CLASSICS.findIndex(([, draw]) => draw === 
 if (startMode.has('reef')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawReef));
 if (startMode.has('cafe')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawCafe));
 if (startMode.has('game')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawBoardGame));
+if (startMode.has('vapor')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVapor));
 if (startMode.has('room')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawRoom));
 if (startMode.has('trail')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawTrail));
 if (startMode.has('terrarium')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawTerrarium));
 if (startMode.has('observatory')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawObservatory));
 // Opens on the village unless the link asks for something else; ?spooky opens the graveyard.
-if (!['chill', 'quest', 'village', 'train', 'farm', 'sail', 'reef', 'cafe', 'game', 'room', 'trail', 'terrarium', 'observatory', 'spooky'].some(k => startMode.has(k))) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVillage));
+if (!['chill', 'quest', 'village', 'train', 'farm', 'sail', 'reef', 'cafe', 'game', 'room', 'trail', 'terrarium', 'observatory', 'vapor', 'spooky'].some(k => startMode.has(k))) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVillage));
 
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
-window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, tCycleMode, G, gUpdate, gMakeRule, L, lUpdate, Hike, wUpdate, W_ANIMALS, E, eUpdate, O, oUpdate, O_TARGETS, qNewParty, F, fUpdate, S, sUpdate, R, rUpdate, R_FISH, K, kUpdate };
+window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, tCycleMode, G, gUpdate, gMakeRule, VW, vwUpdate, L, lUpdate, Hike, wUpdate, W_ANIMALS, E, eUpdate, O, oUpdate, O_TARGETS, qNewParty, F, fUpdate, S, sUpdate, R, rUpdate, R_FISH, K, kUpdate };
 </script>
 </body>
 </html>
