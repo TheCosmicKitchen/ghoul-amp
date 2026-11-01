@@ -517,6 +517,14 @@ const CHAT_BNF = String.raw`
 <handle> ::= <hd_a>_<hd_b> | <hd_a><hd_b>_live | xX<hd_b>Xx | the_real_<hd_b> | <hd_b>_tv
 <hd_a> ::= cryptic | sleepy | mega | tiny | turbo | feral | soggy | polite | cosmic | budget | haunted | gentle
 <hd_b> ::= pancake | gremlin | wizard | toaster | possum | noodle | goblin | biscuit | moth | potato | chromedome | badger
+<almanac> ::= <al_sky> means <al_fate> | plant {crop} when <al_when> | a <al_bird> <al_seen> brings <al_fate> | never trust <al_bird>s in {season} | <al_tip> | good {crop} wants <al_needs>
+<al_sky> ::= red sky at dusk | mist on the pond | a ring round the moon | wind from the barn | low clouds at noon | dew on the gate
+<al_fate> ::= a fair morning | rain by supper | a fine {crop} year | sore knees | stubborn hens | a late frost | plenty of soup
+<al_when> ::= the oak leaves are mouse-eared | the hens look smug | your knees stop complaining | the neighbours start to worry | the moon is waning
+<al_bird> ::= crow | goose | wren | rooster | swallow
+<al_seen> ::= on the left fence | at the well | before breakfast | walking backwards
+<al_tip> ::= turn the compost and your troubles | a dry barn is a happy barn | talk to your {crop}, it cannot argue | mend the gate before the goat does | count your eggs after the fox goes home
+<al_needs> ::= deep soil | patience | a little gossip | morning sun | a kind word
 <town> ::= <t_a><t_b>
 <t_a> ::= Moss | Thistle | Bramble | Willow | Hazel | Clover | Fern | Honey | Pebble | Otter | Marrow | Lark
 <t_b> ::= brook | wick | ford | hollow | dale | stead | bury | mere | combe | haven
@@ -3945,13 +3953,288 @@ function drawTrain(t, dt) {
   }
 }
 
+/* ALMANAC FARM: one farmer works a saved farm through a 40 minute year. */
+const F_SAVE = 'winvamp.farm', F_DAY = 100, F_SEASON_DAYS = 6;
+const F_CROPS = [
+  [{ name: 'CARROT', days: 2, yield: 18, leaf: '#58b04a', fruit: '#e8822a' }, { name: 'PEAS', days: 2, yield: 14, leaf: '#6ec85a', fruit: '#a8e070' }],
+  [{ name: 'CORN', days: 3, yield: 24, leaf: '#4a9a44', fruit: '#f0d050' }, { name: 'TOMATO', days: 2, yield: 20, leaf: '#3e8a40', fruit: '#e0402e' }],
+  [{ name: 'PUMPKIN', days: 3, yield: 12, leaf: '#4f8a3a', fruit: '#ee8a24' }, { name: 'WHEAT', days: 2, yield: 30, leaf: '#c8a840', fruit: '#ecd070' }],
+];
+const F_PLOTS = [[92, 66], [150, 66], [208, 66], [92, 106], [150, 106], [208, 106]];
+const F = { ready: false, name: '', time: 0, tally: {}, plots: [], farmer: null, dog: { x: 80, y: 70 }, hens: [], trees: [], pops: [], news: '', nextNews: 4, banner: null, wx: 'clear', rainDay: -1, saveAt: 0, lastSeason: -1, lastDay: -1, t: 0, forceTime: null };
+const fDayOf = () => Math.floor(F.time / F_DAY);
+const fSeason = () => Math.floor(fDayOf() / F_SEASON_DAYS) % 4;
+const fYear = () => Math.floor(fDayOf() / (F_SEASON_DAYS * 4)) + 1;
+const fNight = () => { const d = F.time / F_DAY % 1; return d > .8 ? clamp((d - .8) / .06) : d < .06 ? 1 - d / .06 : 0; };
+const fPlotCenter = p => [p.x + 25, p.y + 15];
+
+function fStart() {
+  let saved = null;
+  try { saved = JSON.parse(store.get(F_SAVE) || 'null'); } catch {}
+  F.name = saved?.name || `${chatExpand('t_a')} Farm`;
+  F.time = saved?.time || 0;
+  F.tally = saved?.tally || {};
+  F.plots = F_PLOTS.map(([x, y], i) => ({ x, y, stage: 'bare', crop: null, g: 0, wet: false, ...(saved?.plots?.[i] || {}) }));
+  F.farmer = { x: 62, y: 62, tx: 62, ty: 62, job: null, act: 0, kind: '', flip: false, home: false };
+  const rng = vRng(4242);
+  F.hens = Array.from({ length: 6 }, () => ({ x: 34 + rng() * 40, y: 112 + rng() * 24, tx: 50, ty: 120, wait: rng() * 3, peck: 0, col: rng() < .5 ? '#f0e8d8' : '#b87a3a' }));
+  F.trees = [];
+  for (let i = 0; i < 60; i++) {
+    const edge = i % 4, a = rng();
+    const x = edge === 0 ? a * QW : edge === 1 ? a * QW : edge === 2 ? rng() * 12 : QW - rng() * 12, y = edge === 0 ? 8 + rng() * 6 : edge === 1 ? QH - 4 - rng() * 4 : 20 + a * 150;
+    F.trees.push({ x, y, big: rng() < .4, tint: Math.floor(rng() * 3), ph: rng() * 7, apples: rng() < .3 });
+  }
+  F.trees.sort((a, b) => a.y - b.y);
+  F.ready = true;
+}
+
+function fSave() { store.set(F_SAVE, JSON.stringify({ name: F.name, time: F.time, tally: F.tally, plots: F.plots.map(({ stage, crop, g, wet }) => ({ stage, crop, g, wet })) })); }
+
+function fNews(text, t) { F.news = text; F.nextNews = t + rnd(15, 22); }
+
+function fPickJob() {
+  const f = F.farmer, season = fSeason(), near = list => list.sort((a, b) => Math.hypot(a.x - f.x, a.y - f.y) - Math.hypot(b.x - f.x, b.y - f.y))[0];
+  const by = (stage, extra = () => true) => near(F.plots.filter(p => p.stage === stage && extra(p)));
+  let plot, kind;
+  if ((plot = by('ripe'))) kind = 'harvest';
+  else if (season < 3 && (plot = by('bare'))) kind = 'till';
+  else if (season < 3 && (plot = by('tilled'))) kind = 'plant';
+  else if ((plot = by('grow', p => !p.wet))) kind = 'water';
+  if (plot) { const [x, y] = fPlotCenter(plot); return { x, y, kind, plot }; }
+  const chore = [[50, 122, 'feed'], [282, 72, 'milk'], [46, 60, 'wood'], [120, 58, 'rest']][Math.floor(rnd(0, 4))];
+  return { x: chore[0], y: chore[1], kind: chore[2] };
+}
+
+function fFinish(job, t) {
+  const p = job.plot, season = fSeason();
+  if (job.kind === 'till') p.stage = 'tilled';
+  else if (job.kind === 'plant') { const crop = F_CROPS[season][Math.floor(rnd(0, 2))]; p.stage = 'grow'; p.crop = crop.name; p.g = 0; p.wet = F.wx === 'rain'; }
+  else if (job.kind === 'water') p.wet = true;
+  else if (job.kind === 'harvest') {
+    const crop = F_CROPS.flat().find(c => c.name === p.crop), n = Math.round(crop.yield * rnd(.8, 1.25));
+    F.tally[crop.name] = (F.tally[crop.name] || 0) + n;
+    F.pops.push({ x: p.x + 25, y: p.y + 8, text: `+${n} ${crop.name}`, life: 1 });
+    p.stage = 'bare'; p.crop = null; p.g = 0; p.wet = false;
+  }
+}
+
+function fUpdate(t, dt) {
+  F.t = t;
+  if (F.forceTime !== null) F.time = F.forceTime; else F.time += dt;
+  const day = fDayOf(), season = fSeason(), night = fNight() > .5;
+  if (day !== F.lastDay) {
+    F.lastDay = day;
+    F.wx = Math.random() < .25 ? 'rain' : 'clear';
+    F.plots.forEach(p => { p.wet = F.wx === 'rain'; });
+    if (F.wx === 'rain') fNews(season === 3 ? 'Snow overnight. The hens are unimpressed.' : 'Rain today. The watering can gets a day off.', t);
+  }
+  if (season !== F.lastSeason) {
+    if (F.lastSeason !== -1) F.banner = { text: `${V_SEASONS[season]}, YEAR ${fYear()}`, at: t };
+    F.lastSeason = season;
+    if (season === 3) { F.plots.forEach(p => { p.stage = 'bare'; p.crop = null; p.g = 0; }); fNews(`First frost. ${Object.values(F.tally).reduce((a, b) => a + b, 0)} bushels in the ledger so far.`, t); }
+    fSave();
+  }
+  for (const p of F.plots) if (p.stage === 'grow' && p.wet && !night) {
+    p.g += dt / (F_CROPS.flat().find(c => c.name === p.crop).days * F_DAY * .75);
+    if (p.g >= 1) { p.g = 1; p.stage = 'ripe'; }
+  }
+  const f = F.farmer;
+  if (night) { f.job = null; f.act = 0; f.tx = 62; f.ty = 62; }
+  if (f.act > 0) {
+    f.act -= dt;
+    if (f.act <= 0) { fFinish(f.job, t); f.job = null; }
+  } else {
+    const d = Math.hypot(f.tx - f.x, f.ty - f.y), step = 26 * dt;
+    if (d > step) { f.x += (f.tx - f.x) / d * step; f.y += (f.ty - f.y) / d * step; f.flip = f.tx < f.x; f.walking = true; }
+    else {
+      f.x = f.tx; f.y = f.ty; f.walking = false;
+      if (f.job) { f.act = f.job.plot ? 2.2 : 4; }
+      else if (!night) { f.job = fPickJob(); f.tx = f.job.x; f.ty = f.job.y; }
+    }
+  }
+  f.home = night && !f.walking;
+  const d = F.dog, gap = Math.hypot(f.x - 12 - d.x, f.y + 6 - d.y);
+  if (gap > 6) { d.x += (f.x - 12 - d.x) * clamp(dt * 1.6); d.y += (f.y + 6 - d.y) * clamp(dt * 1.6); d.run = true; } else d.run = false;
+  for (const h of F.hens) {
+    h.peck = Math.max(0, h.peck - dt); h.wait -= dt;
+    const gapH = Math.hypot(h.tx - h.x, h.ty - h.y);
+    if (gapH > 1) { h.x += (h.tx - h.x) / gapH * 9 * dt; h.y += (h.ty - h.y) / gapH * 9 * dt; }
+    else if (h.wait < 0) { if (Math.random() < .5) h.peck = 1.2; else { h.tx = 28 + rnd(0, 50); h.ty = 112 + rnd(0, 26); } h.wait = rnd(1, 4); }
+  }
+  for (const p of F.pops) p.life -= dt * .4;
+  F.pops = F.pops.filter(p => p.life > 0);
+  if (t > F.saveAt) { F.saveAt = t + 20; fSave(); }
+}
+
+function fCrop(p, t, season) {
+  const crop = F_CROPS.flat().find(c => c.name === p.crop);
+  if (!crop) return;
+  const grow = Math.min(3, Math.floor(p.g * 3)), ripe = p.stage === 'ripe', sway = Math.round(Math.sin(t * 1.4 + p.x) * .6);
+  for (let r = 0; r < 4; r++) for (let i = 0; i < 7; i++) {
+    const x = p.x + 3 + i * 7, y = p.y + 8 + r * 7;
+    if (grow === 0 && !ripe) { vR(crop.leaf, x, y - 2, 2, 2); continue; }
+    if (crop.name === 'CORN') { const h = 4 + (ripe ? 9 : grow * 3); vR(crop.leaf, x + 1 + sway, y - h, 2, h); vR(crop.leaf, x - 1 + sway, y - h + 3, 2, 1); vR(crop.leaf, x + 3 + sway, y - h + 5, 2, 1); if (ripe) vR(crop.fruit, x + 3 + sway, y - h + 2, 2, 4); }
+    else if (crop.name === 'WHEAT') { const h = 3 + (ripe ? 7 : grow * 2); for (let a = 0; a < 3; a++) { vR(ripe ? crop.leaf : '#7aa84a', x + a * 2 + sway, y - h, 1, h); if (ripe) vR(crop.fruit, x + a * 2 + sway, y - h - 1, 1, 3); } }
+    else if (crop.name === 'PUMPKIN') { vR(crop.leaf, x - 1, y - 3, 6, 2); if (r % 2 === 0 && i % 2 === 0) { const s = ripe ? 5 : grow + 1; vR(crop.fruit, x, y - s, s + 1, s); vR('#b85e14', x + 1, y - s, 1, s); vR('#3e6a2a', x + 2, y - s - 1, 1, 1); } }
+    else { const h = 2 + grow; vR(crop.leaf, x, y - h, 4, h); vR(crop.leaf, x + 1, y - h - 1, 2, 1); if (ripe) { vR(crop.fruit, x + 1, y - 2, 2, 3); } }
+  }
+}
+
+function fFarmer(t) {
+  const f = F.farmer, x = Math.round(f.x), y = Math.round(f.y), kind = f.act > 0 ? f.job?.kind : '', step = f.walking ? Math.floor(t * 8) % 2 : 0, swing = kind ? Math.sin(t * 9) : 0, dir = f.flip ? -1 : 1;
+  vR('rgba(0,0,0,.22)', x - 4, y + 1, 9, 2);
+  vR('#3a3048', x - 3, y - 3, 3, 4 - step); vR('#3a3048', x, y - 3, 3, 3 + step);
+  vR('#3e62a0', x - 3, y - 9, 6, 7); vR('#c8503c', x - 3, y - 10, 6, 3); vR('#3e62a0', x - 2, y - 10, 1, 3); vR('#3e62a0', x + 1, y - 10, 1, 3);
+  vR('#ecc4a2', x - 2, y - 14, 5, 4);
+  vR('#e0c060', x - 5, y - 15, 11, 2); vR('#d0ae50', x - 3, y - 18, 7, 3);
+  if (kind === 'till' || kind === 'wood') { vR('#6a4426', x + dir * 4, y - 12 + Math.round(swing * 3), 1, 11); vR('#a8a8b8', x + dir * 4 - 1, y - 13 + Math.round(swing * 3), 3, 2); if (swing > .8 && SHOW.effects) vR('#6a4a2a', x + dir * 8, y - 1, 2, 1); }
+  if (kind === 'water') { vR('#7a9ab0', x + dir * 5, y - 8, 5, 4); for (let i = 0; i < 4; i++) vR('#a8d8f0', x + dir * (9 + i), y - 6 + (t * 22 + i * 3) % 7, 1, 2); }
+  if (kind === 'plant' || kind === 'feed') { const a = (t * 2) % 1; vR('#ecc4a2', x + dir * 3, y - 8, 3, 2); vR('#e8d890', x + dir * 6, y - 7 + a * 6, 1, 1); vR('#e8d890', x + dir * 8, y - 6 + (a * 5 + 2) % 6, 1, 1); }
+  if (kind === 'harvest') { vR('#a87a40', x + dir * 5, y - 6, 6, 5); vR('#7a5428', x + dir * 5, y - 5, 6, 1); vR('#f0a040', x + dir * 6, y - 8 + Math.round(swing), 3, 2); }
+  if (kind === 'milk') vR('#c8c8d0', x + dir * 5, y - 5, 4, 5);
+  if (kind === 'rest' && Math.floor(t) % 4 === 0) vR('#d8d8e0', x + 5, y - 20, 2, 1);
+}
+
+function drawFarm(t, dt) {
+  if (!F.ready) fStart();
+  fUpdate(t, dt);
+  const season = fSeason(), day = F.time / F_DAY % 1, night = fNight(), rain = F.wx === 'rain', [grassA, grassB] = V_GRASS[season];
+  if (F.groundSeason !== season) {
+    F.groundSeason = season;
+    const s = F.ground ||= Object.assign(document.createElement('canvas'), { width: QW, height: QH }), g = s.getContext('2d'), rng = vRng(9 + season), box = (col, x, y, w, h) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+    box(grassA, 0, 0, QW, QH);
+    for (let i = 0; i < 1500; i++) box(grassB, Math.floor(rng() * QW), Math.floor(rng() * QH), 2, 1);
+    if (season < 2) for (let i = 0; i < 80; i++) box(['#fff0a0', '#ffffff', '#f0a0c8'][i % 3], Math.floor(rng() * QW), Math.floor(rng() * QH), 1, 1);
+    const path = season === 3 ? '#c8c4bc' : '#b89a68';
+    box(path, 54, 58, 10, 12); box(path, 54, 60, 220, 8); box(path, 84, 60, 6, 92); box(path, 260, 60, 8, 8);
+    box('#4a2c18', 22, 104, 62, 1); box(season === 3 ? '#d8d4cc' : '#a89060', 24, 108, 58, 36);
+    for (let i = 0; i < 300; i++) box(season === 3 ? '#c8c4bc' : '#987a50', 24 + Math.floor(rng() * 58), 108 + Math.floor(rng() * 36), 1, 1);
+  }
+  qc.drawImage(F.ground, 0, 0);
+  // Pond at the bottom right of the pasture.
+  qc.fillStyle = season === 3 ? '#c8e0ec' : '#4a96b8'; qc.beginPath(); qc.ellipse(288, 158, 20, 10, 0, 0, 7); qc.fill();
+  if (season < 3) for (let i = 0; i < 2; i++) { const x = 288 + Math.sin(t * .3 + i * 3) * 12, y = 158 + Math.cos(t * .23 + i) * 4; vR('#f4f4e8', x, y, 4, 2); vR('#f4f4e8', x + 3, y - 2, 2, 2); vR('#e8a030', x + 5, y - 1, 1, 1); }
+  for (const p of F.plots) {
+    vR('#4a2c18', p.x - 1, p.y - 1, 52, 32);
+    vR(season === 3 ? '#e4e8ec' : p.stage === 'bare' ? '#7a5a34' : p.wet ? '#3e2a18' : '#5a3e24', p.x, p.y, 50, 30);
+    if (p.stage !== 'bare' && season < 3) for (let r = 0; r < 4; r++) vR(p.wet ? '#2a1c10' : '#46301c', p.x + 1, p.y + 5 + r * 7, 48, 2);
+  }
+  const items = [];
+  F.trees.forEach(tr => items.push([tr.y, () => { vTree(tr, t, season); if (tr.apples && season === 2) { vR('#d83a2a', tr.x - 3, tr.y - 8, 2, 2); vR('#d83a2a', tr.x + 2, tr.y - 7, 2, 2); } }]));
+  for (const p of F.plots) items.push([p.y + 2, () => fCrop(p, t, season)]);
+  const lit = night > .1, roofSnow = season === 3;
+  items.push([56, () => {
+    vR('rgba(0,0,0,.2)', 18, 56, 52, 3); vR('#e4d4b0', 22, 34, 44, 22); vR('#c8b896', 60, 34, 6, 22);
+    for (let i = 0; i < 14; i++) { const inset = Math.floor(i * .9); vR(roofSnow && i > 5 ? '#f4f8fa' : i % 2 ? '#a8483a' : '#94402f', 18 + inset, 33 - i, 52 - inset * 2, 1); }
+    vR('#7a6a5a', 54, 12, 7, 12); vR('#6a4426', 40, 44, 8, 12); vR('#f0c850', 46, 50, 1, 1);
+    for (const x of [27, 54]) { vR(lit ? '#ffd878' : '#47607e', x, 41, 6, 6); vR('#5a4028', x + 2, 41, 1, 6); vR('#5a4028', x, 43, 6, 1); }
+    if (SHOW.effects) vSmoke(56, 12, t, 1);
+  }]);
+  items.push([58, () => {
+    vR('rgba(0,0,0,.2)', 246, 58, 54, 3); vR('#a83a2c', 250, 30, 46, 28); vR('#8a2e24', 290, 30, 6, 28);
+    for (let i = 0; i < 12; i++) { const inset = i; vR(roofSnow && i > 4 ? '#f4f8fa' : '#6a2a22', 247 + inset, 29 - i, 52 - inset * 2, 1); }
+    vR('#f0e8d8', 263, 38, 20, 20); vR('#8a2e24', 265, 40, 16, 16); qc.strokeStyle = '#f0e8d8'; qc.lineWidth = 1; qc.beginPath(); qc.moveTo(265, 40); qc.lineTo(281, 56); qc.moveTo(281, 40); qc.lineTo(265, 56); qc.stroke();
+  }]);
+  items.push([116, () => { vR('#7a5230', 30, 96, 30, 14); for (let i = 0; i < 9; i++) vR('#a8483a', 28 + i, 95 - i, 34 - i * 2, 1); vR('#2a1a10', 42, 103, 6, 7); }]);
+  items.push([120, () => { const crow = (t % 30) < 22, sway = Math.sin(t) * 1; vR('#6a4426', 146, 92, 2, 18); vR('#6a4426', 138, 97, 18, 2); vR('#c84a3a', 142, 97, 10, 8); vR('#e0c060', 143, 90, 8, 7); vR('#d0ae50', 139, 89, 16, 2); if (crow && !night) { vR('#14141c', 154 + sway, 94, 4, 3); vR('#14141c', 157 + sway, 93, 2, 2); vR('#e0a030', 159 + sway, 94, 1, 1); } }]);
+  // Seasonal touches in the open grass above the path and below the plots.
+  for (let i = 0; i < 12; i++) {
+    const x = 92 + i * 13, y = 54, sway = Math.round(Math.sin(t * 1.2 + i) * .6);
+    if (season === 0) items.push([y, () => { vR('#4a9a44', x + 1, y - 4, 1, 4); vR(['#e85a78', '#f0c040', '#b070e0'][i % 3], x, y - 7, 3, 3); }]);
+    if (season === 1) items.push([y, () => { vR('#3e8a40', x + 1 + sway, y - 14, 2, 14); vR('#3e8a40', x + 3 + sway, y - 8, 3, 2); vR('#f0c830', x - 2 + sway, y - 19, 8, 6); vR('#6a4426', x + sway, y - 17, 4, 3); }]);
+  }
+  for (let i = 0; i < 4; i++) {
+    const x = 104 + i * 52, y = 164;
+    if (season === 2) items.push([y, () => { vR('rgba(0,0,0,.2)', x - 8, y, 18, 2); vR('#d8b84a', x - 8, y - 9, 18, 9); vR('#e8cc60', x - 6, y - 13, 14, 4); vR('#b8983a', x - 8, y - 5, 18, 1); }]);
+    if (season === 3 && i === 1) items.push([y, () => { vR('#f4f8fa', x - 6, y - 9, 13, 9); vR('#f4f8fa', x - 4, y - 16, 9, 7); vR('#14141c', x - 2, y - 14, 1, 1); vR('#14141c', x + 2, y - 14, 1, 1); vR('#e8822a', x, y - 13, 3, 1); vR('#c8503c', x - 4, y - 10, 9, 2); vR('#6a4426', x - 10, y - 8, 5, 1); }]);
+  }
+  if (season !== 3) for (let i = 0; i < 3; i++) {
+    const x = 284 + Math.sin(t * .05 + i * 2) * 20, y = 92 + i * 15 + Math.cos(t * .04 + i) * 5, dir = Math.cos(t * .05 + i * 2) > 0 ? 1 : -1, graze = Math.sin(t * .4 + i) > 0 ? 2 : 0;
+    items.push([y, () => {
+      const col = i === 2 ? '#f0f0ec' : '#f4efe4';
+      vR('rgba(0,0,0,.2)', x - 8, y + 1, 16, 2); vR(col, x - 7, y - 8, 14, 7);
+      if (i < 2) { vR('#20202a', x - 5, y - 7, 4, 3); vR('#20202a', x + 2, y - 5, 3, 3); vR('#20202a', x - 6, y - 1, 2, 2); vR('#20202a', x + 4, y - 1, 2, 2); }
+      else { vR('#fff', x - 8, y - 9, 16, 3); vR('#303038', x - 6, y - 1, 2, 2); vR('#303038', x + 4, y - 1, 2, 2); }
+      vR(i < 2 ? col : '#303038', x + dir * 7 - (dir < 0 ? 4 : 0), y - 8 + graze, 5, 4);
+      vR('#20202a', x + dir * 9 - (dir < 0 ? 1 : 0), y - 7 + graze, 1, 1);
+    }]);
+  }
+  for (let y = 72; y < 148; y += 2) if (y % 6 === 0) items.push([y, () => vR('#7a5230', 262, y - 5, 2, 7)]);
+  for (const h of F.hens) items.push([h.y, () => {
+    vR('rgba(0,0,0,.18)', h.x - 2, h.y, 5, 1); vR(h.col, h.x - 2, h.y - 4, 5, 3);
+    vR(h.col, h.x + 2, h.y - (h.peck ? 2 : 6), 2, 3); vR('#d83a2a', h.x + 2, h.y - (h.peck ? 3 : 7), 2, 1); vR('#e8a030', h.x + 4, h.y - (h.peck ? 1 : 5), 1, 1);
+  }]);
+  if (!F.farmer.home) items.push([F.farmer.y, () => fFarmer(t)]);
+  if (SHOW.pets && !F.farmer.home) items.push([F.dog.y, () => { const d = F.dog, x = Math.round(d.x), y = Math.round(d.y), hop = d.run ? Math.round(Math.abs(Math.sin(t * 10))) : 0; vR('rgba(0,0,0,.2)', x - 4, y + 1, 9, 1); vR('#b8895a', x - 4, y - 3 - hop, 8, 4); vR('#b8895a', x + 3, y - 6 - hop, 4, 4); vR('#7a5a34', x + 3, y - 6 - hop, 1, 3); vR('#b8895a', x - 6, y - 5 - hop + Math.round(Math.sin(t * 12)), 2, 2); }]);
+  items.sort((a, b) => a[0] - b[0]);
+  for (const item of items) item[1]();
+  for (let x = 262; x < 306; x += 10) { vR('#7a5230', x, 70, 2, 7); }
+  vR('#8a6238', 262, 72, 44, 1);
+  if (SHOW.effects) {
+    if (rain) for (let i = 0; i < 110; i++) { const snow = season === 3, y = (t * (snow ? 20 : 150) + i * 37) % QH, x = (i * 53 + (snow ? Math.sin(t + i) * 6 : y * .1)) % QW; vR(snow ? '#fff' : 'rgba(200,220,255,.6)', x, y, 1, snow ? 1 : 4); }
+    if (rain) { qc.fillStyle = 'rgba(30,40,70,.18)'; qc.fillRect(0, 0, QW, QH); }
+    if (season === 2) for (let i = 0; i < 12; i++) vR(['#c8642a', '#d8a030'][i % 2], (i * 61 + t * 9 + Math.sin(t + i) * 8) % QW, (i * 29 + t * 12) % QH, 2, 1);
+    if (season < 2 && !night) for (let i = 0; i < 6; i++) if (Math.sin(t * 9 + i) > -.3) vR(['#fff', '#f0d060', '#f0a0c8'][i % 3], (i * 53 + Math.sin(t * .7 + i) * 18 + 30) % QW, 60 + (i * 41 + Math.cos(t * .6 + i) * 10) % 90, 2, 1);
+  }
+  const tint = Math.max(day < .12 ? 1 - day / .12 : 0, day > .66 && day < .84 ? Math.sin((day - .66) / .18 * Math.PI) : 0);
+  if (tint && SHOW.lights) { qc.fillStyle = `rgba(255,130,60,${tint * .2})`; qc.fillRect(0, 0, QW, QH); }
+  if (night && SHOW.lights) {
+    const lights = [[30, 44, 30, '#ffb050'], [57, 44, 30, '#ffb050'], [273, 56, 26, '#ffc060']];
+    qd.globalCompositeOperation = 'source-over'; qd.globalAlpha = 1; qd.clearRect(0, 0, QW, QH);
+    qd.fillStyle = `rgba(10,14,44,${night * .72})`; qd.fillRect(0, 0, QW, QH);
+    qd.globalCompositeOperation = 'destination-out';
+    for (const [x, y, r] of lights) { qd.globalAlpha = .92; qd.drawImage(qGlow, x - r, y - r, r * 2, r * 2); }
+    qc.drawImage(qDark, 0, 0);
+    if (SHOW.effects && season === 1) for (let i = 0; i < 18; i++) if (Math.sin(t * 2 + i * 2) > .2) vR('#e8ff90', (i * 47 + Math.sin(t * .4 + i) * 14 + 14) % QW, (i * 37 + Math.cos(t * .5 + i) * 10 + 10) % QH, 1, 1);
+  }
+
+  const s = Math.min(W / QW, H / QH), ox = (W - QW * s) / 2, oy = (H - QH * s) / 2, P = v => v * s;
+  c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(qLow, ox, oy, QW * s, QH * s);
+  c.imageSmoothingEnabled = true;
+  const win = (x, y, w, h) => {
+    c.fillStyle = 'rgba(246,236,214,.94)'; c.fillRect(ox + P(x), oy + P(y), P(w), P(h));
+    c.strokeStyle = '#6a5238'; c.lineWidth = P(.8); c.strokeRect(ox + P(x), oy + P(y), P(w), P(h));
+  };
+  const text = (str, x, y, size, col = '#4a3826', align = 'left') => {
+    c.fillStyle = col; c.textAlign = align; c.font = `${P(size)}px VT323, monospace`;
+    c.fillText(str, ox + P(x), oy + P(y));
+  };
+  for (const p of F.pops) { c.globalAlpha = clamp(p.life * 2); text(p.text, p.x, p.y - (1 - p.life) * 14, 8, '#fff6c0', 'center'); c.globalAlpha = 1; }
+  if (SHOW.stats) {
+    const best = Object.entries(F.tally).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${v} ${k}`).join('  ');
+    win(3, 3, 150, 17);
+    text(F.name.toUpperCase(), 7, 10, 7.5, '#8a3a2a');
+    text(`${V_SEASONS[season]} DAY ${fDayOf() % F_SEASON_DAYS + 1}, YEAR ${fYear()}`, 149, 10, 6.5, '#4a3826', 'right');
+    text(best || 'THE LEDGER IS EMPTY', 7, 17, 6.5);
+  }
+  if (t > F.nextNews) {
+    const crops = F_CROPS[Math.min(season, 2)], vars = { crop: crops[Math.floor(rnd(0, 2))].name.toLowerCase(), season: V_SEASONS[season].toLowerCase() };
+    const line = chatExpand('almanac').replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? key).replace(/ {2,}/g, ' ').trim();
+    fNews(line[0].toUpperCase() + line.slice(1), t);
+  }
+  if (SHOW.log && F.news) {
+    win(3, QH - 15, 280, 12);
+    text('ALMANAC', 7, QH - 7, 7, '#8a3a2a');
+    text(F.news, 37, QH - 7, 7.5);
+  }
+  if (SHOW.banners && F.banner && t - F.banner.at < 3.5) {
+    const age = t - F.banner.at;
+    c.globalAlpha = clamp(Math.min(age * 3, (3.5 - age) * 3));
+    win(170, 6, 100, 13);
+    text(F.banner.text, 220, 15, 8, '#8a3a2a', 'center');
+    c.globalAlpha = 1;
+  }
+}
+
 const CLASSICS = [
   ['SWIRL', drawSwirl, 'classics'], ['BARS', drawSpectrum, 'classics'], ['PLASMA', drawPlasma, 'classics'], ['KALEIDO', drawKaleido, 'classics'], ['SCOPE', drawScope, 'classics'],
   ['BATTERY', drawBattery, 'wmp9'], ['ALCHEMY', drawAlchemy, 'wmp9'], ['AMBIENCE', drawAmbience, 'wmp9'], ['FIRE', drawFirestorm, 'wmp9'], ['MIST', drawMist, 'wmp9'],
   ['SPIKES', drawSpikes, 'xp'], ['PLENOPT', drawPlenoptic, 'xp'], ['PARTICLE', drawParticle, 'xp'], ['COLORS', drawColors, 'xp'], ['DOTS', drawDots, 'xp'],
   ['SUNSET', drawSunset, 'chill'], ['AURORA', drawAurora, 'chill'], ['HEARTH', drawHearth, 'chill'], ['RAIN', drawRain, 'chill'],
   ['LAVA', drawLava, 'chill'], ['KOI', drawKoi, 'chill'], ['PEAKS', drawPeaks, 'chill'], ['STARS', drawStarry, 'chill'],
-  ['8-BIT QUEST', drawQuest, 'chill'], ['POCKET VILLAGE', drawVillage, 'chill'], ['NIGHT TRAIN', drawTrain, 'chill'],
+  ['8-BIT QUEST', drawQuest, 'chill'], ['POCKET VILLAGE', drawVillage, 'chill'], ['NIGHT TRAIN', drawTrain, 'chill'], ['ALMANAC FARM', drawFarm, 'chill'],
 ];
 
 // Each shuffle plays everything once before repeating.
@@ -4230,10 +4513,11 @@ if (startMode.has('chill')) setShuffle('chill');
 if (startMode.has('quest')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawQuest));
 if (startMode.has('village')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVillage));
 if (startMode.has('train')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawTrain));
+if (startMode.has('farm')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawFarm));
 
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
-window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, T_REGIONS, qNewParty };
+window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, T_REGIONS, qNewParty, F, fUpdate };
 </script>
 </body>
 </html>
