@@ -558,6 +558,37 @@ const CHAT_BNF = String.raw`
 <bg_ev_reshape> ::= the map has been redrawn by a committee of moths.
 <bg_ev_units> ::= scoring has moved to a new currency.
 <bg_end> ::= everyone has won, except the board | the winner is the small bishop | the game has ended, or has it | nobody won. everyone is now a duke | final score: yes
+<album> ::= <al_a> <al_b> | the <al_b> tapes | <al_b> for <al_c> | <al_a> <al_b>, vol. 2
+<al_a> ::= slow | sunday | velvet | soft | midnight | rainy | paper | quiet
+<al_b> ::= kettles | motels | satellites | gardens | postcards | moths | radiators | lanterns
+<al_c> ::= beginners | the bus home | sleeping cats | nobody in particular
+<book> ::= a novel about <bk_a> | the one with <bk_a> | a long book on <bk_b>
+<bk_a> ::= a lighthouse keeper | two rival bakers | a very sad duke | a stolen cello
+<bk_b> ::= moss | the history of the spoon | Icelandic weather | small bridges
+<roomlog> ::= <rm_a> | {album} is on again | the cat has <rm_b> | <rm_c> | the kettle has <rm_d>
+<rm_a> ::= nothing happened today, wonderfully | wrote one good sentence | meant to go out, did not | tidied one shelf and called it a day
+<rm_b> ::= knocked a pen off the desk | found the warm spot | claimed the good cushion | looked at me for some time
+<rm_c> ::= the neighbour is practising trombone again | the plant has a new leaf | the rain is doing most of the work
+<rm_d> ::= opinions | clicked off and gone unnoticed | been boiled for the third time
+<sketch> ::= sketched the {animal} from a polite distance | the {animal} did not care for the portrait | a {animal}! the dog pretends not to notice | the {animal} held still for nearly a whole sketch
+<traillog> ::= <tl_a> | the dog <tl_b> | {km} km and <tl_c> | the {biome} smells of <tl_d>
+<tl_a> ::= found a very good stick | filled the bottle at a stream | a signpost pointed both ways | lunch was the same as yesterday, and excellent
+<tl_b> ::= has found a better stick | is pleased with everything | rolled in something | waits at the next bend
+<tl_c> ::= no sign of a shop | both boots holding | the map remains optimistic
+<tl_d> ::= rain coming | warm stone | moss and pine | somebody's far-off campfire
+<terralog> ::= <te_a> | {born} creatures born here so far | {season} has reached the glass | the rabbits <te_b> | the foxes <te_c>
+<te_a> ::= the moss has reached the old log | a beetle crossed the whole pond edge | the glass needs a wipe, nobody volunteers
+<te_b> ::= have held a meeting | are multiplying as expected | have discovered the good clover
+<te_c> ::= are pretending to be asleep | are taking the long view | seem to be thinking about it
+<constel> ::= the <cn_a> <cn_b> | <cn_b> <cn_c>
+<cn_a> ::= Lesser | Greater | Sleeping | Lost | Northern | Patient
+<cn_b> ::= Teapot | Ladle | Heron | Bicycle | Goose | Slipper | Accordion | Wheelbarrow
+<cn_c> ::= Minor | Major | Australis | Borealis
+<obslog> ::= {target} is <ob_a> tonight | <ob_b> | the seeing is <ob_c> | tea finished, {target} still there | <ob_d>
+<ob_a> ::= unusually steady | shy behind the neighbour's chimney | worth the cold | looking well
+<ob_b> ::= the neighbour's porch light is on again | both socks are wet | an owl disagrees with the telescope | found my lens cap, it was in my hand
+<ob_c> ::= excellent | fair | better after the second biscuit
+<ob_d> ::= light from that star left before the kettle was invented | the universe remains large | nothing to report, beautifully
 <boat> ::= the <t_a> <bt_n> | the <bt_a> <bt_n>
 <bt_a> ::= Gentle | Salty | Plucky | Stubborn | Merry | Humble
 <bt_n> ::= Wanderer | Petrel | Dawn | Kettle | Albatross | Mermaid | Biscuit | Heron
@@ -5197,6 +5228,458 @@ function drawCafe(t, dt) {
   cozyPanels(ui, K, 'NOTICEBOARD', t);
 }
 
+/* LO-FI ROOM: someone pottering around a bedroom while the records turn. */
+const L_SAVE = 'winvamp.room';
+const L_DO = { read: 112, nap: 60, record: 288, water: 150, desk: 232 };
+const L = { ready: false, x: 232, tx: 232, doing: 'desk', until: 12, plants: [], album: '', spins: 0, books: 0, spin: 0, cat: 0, catUntil: 30, news: '', nextNews: 5, banner: null, saveAt: 0, t: 0, forceHour: null, rain: false, wxUntil: 200, flip: false };
+const L_CAT = [[136, 88], [56, 110], [150, 150], [106, 102]];
+
+function lHour() {
+  if (L.forceHour !== null) return L.forceHour;
+  if (SHOW.realtime) { const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  return (8 + L.t / 480 * 24) % 24;
+}
+function lStart() {
+  let saved = null;
+  try { saved = JSON.parse(store.get(L_SAVE) || 'null'); } catch {}
+  L.plants = saved?.plants || [.15, .3, .1, .22];
+  L.spins = saved?.spins || 0; L.books = saved?.books || 0;
+  L.album = chatExpand('album');
+  L.ready = true;
+}
+function lSave() { store.set(L_SAVE, JSON.stringify({ plants: L.plants, spins: L.spins, books: L.books })); }
+
+function lUpdate(t, dt) {
+  L.t = t;
+  const d = L.tx - L.x, step = 24 * dt;
+  if (Math.abs(d) > step) { L.x += Math.sign(d) * step; L.flip = d < 0; L.walking = true; }
+  else {
+    L.x = L.tx; L.walking = false;
+    if (t > L.until) {
+      if (L.doing === 'water') { L.plants = L.plants.map(g => Math.min(1, g + .05)); L.news = 'The plants have been watered and seem smug about it.'; L.nextNews = t + 14; }
+      if (L.doing === 'read') { L.books++; L.news = `Finished ${chatExpand('book')}. ${L.books} books this year.`; L.nextNews = t + 14; }
+      const h = lHour(), pool = h >= 23 || h < 6 ? ['nap', 'nap', 'nap', 'read'] : ['read', 'desk', 'record', 'water', 'nap', 'read', 'desk'], next = pool.filter(k => k !== L.doing);
+      L.doing = next[Math.floor(rnd(0, next.length))]; L.tx = L_DO[L.doing]; L.until = t + rnd(24, 60) + Math.abs(L.tx - L.x) / 24;
+      if (L.doing === 'record') { L.album = chatExpand('album'); L.spins++; L.banner = { text: `NOW SPINNING: ${L.album.toUpperCase()}`, at: t + 3 }; }
+      lSave();
+    }
+  }
+  if (t > L.catUntil) { L.cat = L.doing === 'nap' ? 1 : Math.floor(rnd(0, 4)); L.catUntil = t + rnd(40, 90); }
+  if (t > L.wxUntil) { L.rain = Math.random() < .45; L.wxUntil = t + rnd(150, 320); }
+  L.spin += dt * 3;
+  if (t > L.saveAt) { L.saveAt = t + 20; lSave(); }
+}
+
+function lPlant(x, y, g, kind, t) {
+  vR('#b0603a', x - 5, y - 8, 11, 8); vR('#8a4a2a', x - 6, y - 9, 13, 2);
+  const n = 2 + Math.floor(g * 7), sway = Math.sin(t * .8 + x) * .8;
+  for (let i = 0; i < n; i++) {
+    const a = -1.57 + (i - n / 2) * (kind ? .34 : .24), l = 7 + g * 20 * (1 - Math.abs(i - n / 2) / n), ex = x + Math.cos(a) * l + sway, ey = y - 9 + Math.sin(a) * l;
+    qc.strokeStyle = kind ? '#4a9a5a' : '#3a8a4a'; qc.lineWidth = kind ? 2 : 1; qc.beginPath(); qc.moveTo(x, y - 9); qc.lineTo(ex, ey); qc.stroke();
+    if (!kind) qOval(ex, ey, 3, 2, '#4faa5e');
+    if (g > .6 && i % 3 === 0) vR(['#f06a90', '#f0d050'][i % 2], ex - 1, ey - 2, 3, 3);
+  }
+}
+
+function drawRoom(t, dt) {
+  if (!L.ready) lStart();
+  lUpdate(t, dt);
+  const h = lHour(), dark = h >= 20 || h < 5 ? 1 : h < 7 ? (7 - h) / 2 : h >= 17 ? (h - 17) / 3 : 0;
+  const sky = qc.createLinearGradient(0, 24, 0, 92), warm = h >= 16 && h < 20 ? .7 : h < 8 ? .4 : 0;
+  sky.addColorStop(0, tRgb(tMix(tMix([120, 180, 226], [40, 40, 96], warm), [10, 14, 40], dark))); sky.addColorStop(1, tRgb(tMix(tMix([200, 226, 240], [244, 150, 110], warm), [28, 30, 70], dark)));
+  qc.fillStyle = sky; qc.fillRect(0, 0, QW, QH);
+  if (dark > .4) for (let i = 0; i < 30; i++) vR('#fff', 122 + (i * 37) % 76, 26 + (i * 23) % 42, 1, 1);
+  const sunx = 120 + ((h - 6) / 14) * 80;
+  if (h > 6 && h < 20) { qc.fillStyle = dark > .5 ? '#f0ecd8' : '#ffe8a8'; qc.beginPath(); qc.arc(sunx, 40 + Math.abs(h - 13) * 6, 8, 0, 7); qc.fill(); }
+  for (const [x, w, top] of [[120, 22, 70], [144, 30, 62], [176, 24, 74]]) { vR(tRgb(tMix([120, 130, 150], [18, 20, 44], dark)), x, top, w, 30); for (let a = 0; a < 3; a++) vR(tHash(x, a) < .3 + dark * .5 ? '#ffd878' : tRgb(tMix([96, 110, 130], [30, 32, 60], dark)), x + 3 + a * 6, top + 5, 3, 4); }
+  if (SHOW.effects && L.rain) for (let i = 0; i < 40; i++) { const y = 24 + (t * 80 + i * 17) % 68; vR('rgba(210,226,255,.6)', 120 + (i * 29) % 80, y, 1, 3); }
+  const wall = '#a88a9a', box = vR;
+  box(wall, 0, 0, 120, 134); box(wall, 200, 0, 120, 134); box(wall, 120, 0, 80, 24); box(wall, 120, 92, 80, 42);
+  for (let i = 0; i < 12; i++) box('#9e8090', i * 27, 0, 1, 134);
+  box('#6a4426', 116, 20, 88, 4); box('#6a4426', 116, 92, 88, 5); box('#6a4426', 116, 20, 4, 74); box('#6a4426', 200, 20, 4, 74); box('#6a4426', 159, 24, 2, 68);
+  for (let i = 0; i < 9; i++) { const f = Math.sin(i * .9 + t * .4) * 2; box(i % 3 ? '#d8b878' : '#c8a868', 106 + i, 18 + i * 8, 11 + f, 8); box(i % 3 ? '#d8b878' : '#c8a868', 203 - f, 18 + i * 8, 11 + f, 8); }
+  box('#7a5636', 0, 134, QW, 46); for (let i = 0; i < 9; i++) box('#6c4a2e', 0, 136 + i * 5, QW, 1);
+  qOval(150, 156, 66, 14, '#8a3a4a'); qOval(150, 156, 56, 11, '#c88a5a'); qOval(150, 156, 44, 8, '#8a3a4a');
+  if (h > 7 && h < 18 && !L.rain) { const sx = 120 + (h - 7) * 8; qc.fillStyle = 'rgba(255,226,150,.2)'; qc.beginPath(); qc.moveTo(120, 92); qc.lineTo(200, 92); qc.lineTo(sx + 90, 170); qc.lineTo(sx - 30, 170); qc.fill(); }
+  // Posters, shelf, bed, chair, desk and record player.
+  box('#f4efe0', 22, 26, 34, 44); box('#e87a50', 25, 29, 28, 20); qOval(39, 42, 10, 10, '#ffd060'); box('#3a5a7a', 25, 49, 28, 18);
+  box('#f4efe0', 76, 34, 24, 30); box('#3a7a6a', 78, 36, 20, 26); box('#f0e080', 84, 42, 8, 8);
+  box('#6a4426', 214, 34, 96, 3); box('#6a4426', 214, 62, 96, 3);
+  for (let i = 0; i < 26; i++) { box(['#c84a3a', '#3e62a0', '#e0b030', '#3a8a5a', '#8a5ac8', '#e8e0d0'][(i * 7) % 6], 216 + i * 3.5, 40 + (i * 5) % 6, 3, 22 - (i * 5) % 6); }
+  for (let i = 0; i < 14; i++) box(['#3e62a0', '#c84a3a', '#2a2a34', '#e0b030'][i % 4], 218 + i * 6, 14 + (i % 3) * 2, 5, 20 - (i % 3) * 2);
+  box('#4a2c18', 12, 104, 6, 40); box('#4a2c18', 86, 122, 5, 22); box('#6a4426', 12, 130, 78, 10); box('#e8e0d0', 18, 122, 68, 9); box('#5a7ab0', 34, 118, 54, 13); box('#4a6a9e', 34, 126, 54, 5); qOval(26, 120, 10, 5, '#f4efe6');
+  box('#6a3a4a', 98, 116, 34, 24); box('#7a4a5a', 98, 104, 8, 36); box('#7a4a5a', 126, 114, 8, 26); box('#8a5a6a', 106, 112, 20, 8); box('#3a2418', 102, 140, 3, 5); box('#3a2418', 126, 140, 3, 5);
+  box('#6a4426', 216, 106, 46, 4); box('#4a2c18', 218, 110, 3, 34); box('#4a2c18', 258, 110, 3, 34); box('#30303a', 226, 90, 22, 15); box(dark > .3 ? '#7ac8ff' : '#a8d8f0', 228, 92, 18, 11); box('#30303a', 236, 105, 3, 2);
+  for (let i = 0; i < 3; i++) { const on = Math.sin(t * 4 + i) > 0; box(on && L.doing === 'desk' ? '#2a3a5a' : '#5a7aa0', 230, 94 + i * 3, 8 + (i * 5) % 8, 1); }
+  box('#f0e8d8', 252, 101, 6, 5); box('#7a4a2a', 253, 101, 4, 1);
+  if (SHOW.effects) vSmoke(254, 100, t, 3);
+  box('#5a3a22', 268, 118, 44, 26); box('#3e2616', 270, 120, 40, 22); box('#2a2a34', 270, 104, 34, 14); box('#14141c', 272, 102, 30, 3);
+  qc.save(); qc.translate(287, 103); qc.scale(1, .3); qc.rotate(L.spin); qc.fillStyle = '#14141c'; qc.beginPath(); qc.arc(0, 0, 13, 0, 7); qc.fill(); qc.fillStyle = '#e87a50'; qc.fillRect(-4, -4, 8, 8); qc.restore();
+  box('#c8c8d4', 300, 98, 1, 6); box('#c8c8d4', 292, 98, 9, 1);
+  if (SHOW.effects) for (let i = 0; i < 4; i++) { const a = (t * .22 + i / 4) % 1; qc.globalAlpha = 1 - a; box('#ffe8b0', 290 + Math.sin(a * 7 + i) * 8, 96 - a * 40, 3, 2); box('#ffe8b0', 292 + Math.sin(a * 7 + i) * 8, 90 - a * 40, 1, 6); } qc.globalAlpha = 1;
+  L.plants.forEach((g, i) => lPlant(128 + i * 21, 92, g, i % 2, t));
+  const vine = 8 + L.plants[0] * 30; for (let i = 0; i < vine; i += 4) qOval(66 + Math.sin(i * .3 + t * .4) * 2, 8 + i, 3, 2, '#4faa5e'); box('#b0603a', 60, 2, 12, 7);
+  const [cx, cy] = L_CAT[L.cat], ct = Math.round(Math.sin(t) * 2);
+  if (SHOW.pets) { box('#c87a30', cx, cy, 15, 7); box('#c87a30', cx + 12, cy - 5, 7, 7); box('#c87a30', cx + 12, cy - 7, 2, 2); box('#c87a30', cx + 17, cy - 7, 2, 2); box('#c87a30', cx - 4, cy + 4 + ct, 5, 2); box('#a85e20', cx + 3, cy, 2, 7); box('#a85e20', cx + 8, cy, 2, 7); }
+  const x = Math.round(L.x), dir = L.flip ? -1 : 1, moving = L.walking, act = moving ? '' : L.doing, step = moving ? Math.floor(t * 7) % 2 : 0, hair = '#3a2414', top = '#d8704a';
+  if (act === 'nap') { box('#ecc4a2', 28, 113, 8, 8); box(hair, 27, 112, 9, 4); box('#5a7ab0', 36, 114, 46, 8); if (Math.floor(t) % 3 === 0) { box('#d8d8e8', 44, 100, 3, 1); box('#d8d8e8', 50, 94, 4, 1); } }
+  else if (act === 'read') { box('#3e4a68', 110, 118, 18, 6); box(top, 106, 96, 11, 20); box('#ecc4a2', 107, 86, 9, 10); box(hair, 106, 84, 11, 5); box('#c84a3a', 118, 104, 9, 7); box('#f4efe0', 119, 105, 3, 5); box('#ecc4a2', 116, 106, 4, 3); }
+  else {
+    box('#3e4a68', x - 5, 130 - 14, 5, 22 - step); box('#3e4a68', x, 130 - 14, 5, 21 + step);
+    box(top, x - 6, 94, 12, 22); box('#ecc4a2', x - 4, 83, 9, 11); box(hair, x - 5, 81, 11, 5); box(hair, x - dir * 5 - 1, 85, 2, 6); box('#201820', x + dir * 2, 88, 1, 2);
+    if (act === 'water') { box('#7a9ab0', x - 12, 98, 9, 6); for (let i = 0; i < 3; i++) box('#a8d8f0', x - 16 - i, 96 - (t * 12 + i) % 4, 1, 2); }
+    if (act === 'record') { box(top, x + 5, 100, 12, 4); box('#ecc4a2', x + 16, 100, 3, 4); }
+    if (act === 'desk') { box(top, x - 15, 100, 11, 4); box('#ecc4a2', x - 17, 100, 3, 4); }
+  }
+  box('#c8a04a', 204, 96, 2, 38); qPoly([[197, 96], [213, 96], [209, 86], [201, 86]], '#e8c878');
+  if (dark > 0 && SHOW.lights) {
+    qc.fillStyle = `rgba(14,10,34,${dark * .55})`; qc.beginPath(); qc.rect(0, 0, QW, QH); qc.rect(120, 24, 80, 68); qc.fill('evenodd');
+    qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = dark * .55; qc.drawImage(qTint('#ffb860'), 120, 40, 170, 130); qc.drawImage(qTint('#8ab0ff'), 200, 60, 70, 70); qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over';
+  }
+  const ui = cozyPresent();
+  if (SHOW.stats) { ui.win(3, 3, 112, 11); ui.text(`${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor(h % 1 * 60)).padStart(2, '0')}  ${L.spins} RECORDS  ${L.books} BOOKS`, 7, 10.5, 6.8, '#8a3a2a'); }
+  if (t > L.nextNews) { L.news = cozyLine('roomlog', { album: L.album }); L.nextNews = t + rnd(15, 22); }
+  cozyPanels(ui, L, 'DIARY', t);
+}
+
+/* LONG TRAIL: a hiker and a dog on an endless path, sketching the wildlife. */
+const W_SAVE = 'winvamp.trail';
+const W_BIOMES = [
+  ['PINE FOREST', [64, 120, 96], [30, 84, 62], [120, 150, 90], 'pine'], ['WILD MEADOW', [120, 170, 110], [96, 156, 76], [150, 184, 84], 'flower'], ['AUTUMN WOOD', [190, 130, 70], [170, 80, 44], [150, 120, 60], 'round'],
+  ['LAKESHORE', [100, 150, 170], [60, 130, 110], [176, 170, 120], 'reed'], ['HIGH FOOTHILLS', [130, 130, 160], [110, 120, 110], [150, 150, 120], 'rock'], ['SNOWLINE', [190, 204, 226], [214, 226, 238], [236, 242, 248], 'pine'],
+];
+const W_ANIMALS = [['DEER', '#a87a4a', 'q'], ['FOX', '#d8702a', 'q'], ['RABBIT', '#c8b8a0', 's'], ['HEDGEHOG', '#6a5a4a', 's'], ['BADGER', '#4a4a50', 'q'], ['MOOSE', '#5a3a28', 'b'], ['BEAR', '#5a4030', 'b'], ['GOAT', '#e0dcd0', 'q'], ['HERON', '#9aa8b8', 'f'], ['OWL', '#9a8a70', 'f'], ['EAGLE', '#4a3a2a', 'f'], ['MARMOT', '#9a7a50', 's']];
+const Hike = { ready: false, S: 0, km: 0, days: 1, book: [], biome: 0, nextBiome: 1, blend: 0, swapAt: 60, sp: 1, time: 40, camp: false, sketch: 0, animal: null, nextAnimal: 12, news: '', nextNews: 5, banner: null, saveAt: 0, t: 0, forcePhase: null };
+
+function wStart() {
+  let saved = null;
+  try { saved = JSON.parse(store.get(W_SAVE) || 'null'); } catch {}
+  Object.assign(Hike, { km: saved?.km || 0, days: saved?.days || 1, book: saved?.book || [], time: saved?.time || 40, biome: saved?.biome || 0, ready: true });
+}
+function wSave() { store.set(W_SAVE, JSON.stringify({ km: Hike.km, days: Hike.days, book: Hike.book, time: Hike.time, biome: Hike.biome })); }
+const wPhase = () => Hike.forcePhase ?? (Hike.time / 360) % 1;
+
+function wUpdate(t, dt) {
+  Hike.t = t; Hike.time += dt;
+  const ph = wPhase(), wasCamp = Hike.camp;
+  Hike.camp = ph > .72;
+  if (Hike.camp && !wasCamp) { Hike.news = 'Camp for the night. The dog claims the warm side.'; Hike.nextNews = t + 16; Hike.banner = { text: `DAY ${Hike.days} ENDS`, at: t }; }
+  if (!Hike.camp && wasCamp) { Hike.days++; Hike.banner = { text: `DAY ${Hike.days}`, at: t }; wSave(); }
+  const stopped = Hike.camp || t < Hike.sketch;
+  Hike.sp += ((stopped ? 0 : 1) - Hike.sp) * clamp(dt * 1.5);
+  Hike.S += 34 * Hike.sp * dt; Hike.km += Hike.sp * dt * .02;
+  if (t > Hike.swapAt) { Hike.nextBiome = (Hike.biome + 1 + Math.floor(rnd(0, 5))) % 6; Hike.swapAt = t + rnd(70, 130); Hike.blending = true; }
+  if (Hike.blending) { Hike.blend += dt / 14; if (Hike.blend >= 1) { Hike.blend = 0; Hike.biome = Hike.nextBiome; Hike.blending = false; Hike.news = `The trail enters the ${W_BIOMES[Hike.biome][0].toLowerCase()}.`; Hike.nextNews = t + 15; } }
+  if (!Hike.animal && t > Hike.nextAnimal && !Hike.camp) { const a = W_ANIMALS[Math.floor(rnd(0, W_ANIMALS.length))]; Hike.animal = { a, x: QW + 30, ph: rnd(0, 7) }; }
+  if (Hike.animal) {
+    Hike.animal.x -= (34 * Hike.sp * .55 + (t < Hike.sketch ? 0 : 3)) * dt;
+    if (!Hike.animal.seen && Hike.animal.x < 190) {
+      Hike.animal.seen = true; Hike.sketch = t + 7;
+      const name = Hike.animal.a[0], fresh = !Hike.book.includes(name);
+      if (fresh) { Hike.book.push(name); Hike.banner = { text: `NEW SKETCH: ${name}`, at: t }; }
+      Hike.news = cozyLine('sketch', { animal: name.toLowerCase() }); Hike.nextNews = t + 15; wSave();
+    }
+    if (Hike.animal.x < -40) { Hike.animal = null; Hike.nextAnimal = t + rnd(18, 40); }
+  }
+  if (t > Hike.saveAt) { Hike.saveAt = t + 20; wSave(); }
+}
+
+function wAnimal(an, x, y, t) {
+  const [name, col, type] = an.a, walk = Math.sin(t * 7) > 0 ? 1 : 0;
+  if (type === 'f') {
+    const flap = Math.sin(t * 8) * 4, by = y - 34 + Math.sin(t) * 3;
+    qOval(x, by, 7, 4, col); qPoly([[x - 2, by], [x + 4, by], [x - 8, by - 6 + flap]], col); qPoly([[x - 2, by], [x + 4, by], [x + 10, by - 6 + flap]], col); vR('#e8c040', x - 8, by - 1, 2, 1);
+    return;
+  }
+  if (type === 's') { qOval(x, y - 4, 6, 4, col); vR(col, x - 7, y - 7, 4, 4); vR('#201820', x - 6, y - 6, 1, 1); if (name === 'RABBIT') vR(col, x - 6, y - 12, 2, 5); return; }
+  const big = type === 'b' ? 1.4 : 1;
+  qOval(x, y - 9 * big, 9 * big, 5 * big, col);
+  for (const [a, b] of [[-6, walk], [-3, 1 - walk], [4, walk], [7, 1 - walk]]) vR(col, x + a * big, y - 7 * big, 2, 7 * big - b);
+  vR(col, x - 11 * big, y - 15 * big, 5 * big, 5 * big); vR(col, x - 9 * big, y - 12 * big, 3 * big, 5 * big); vR('#201820', x - 10 * big, y - 14 * big, 1, 1);
+  if (name === 'DEER' || name === 'MOOSE') { vR('#6a4426', x - 11 * big, y - 21 * big, 1, 6 * big); vR('#6a4426', x - 8 * big, y - 21 * big, 1, 6 * big); vR('#6a4426', x - 13 * big, y - 20 * big, 8 * big, 1); }
+  if (name === 'FOX') vR('#fff', x + 9, y - 10, 5, 3);
+}
+
+function drawTrail(t, dt) {
+  if (!Hike.ready) wStart();
+  wUpdate(t, dt);
+  const ph = wPhase(), night = ph > .78 ? clamp(Math.min((ph - .78) / .05, (1 - ph) / .05)) : ph < .04 ? 1 - ph / .04 : 0, dusk = ph > .62 && ph < .84 ? Math.sin((ph - .62) / .22 * Math.PI) : ph < .1 ? 1 - ph / .1 : 0;
+  const a = W_BIOMES[Hike.biome], b = W_BIOMES[Hike.blending ? Hike.nextBiome : Hike.biome], m = Hike.blend, mix = i => tMix(a[i + 1], b[i + 1], m), shade = c3 => tRgb(tMix(tMix(c3, [220, 110, 80], dusk * .22), [10, 14, 38], night * .82)), kind = m > .5 ? b[4] : a[4];
+  const sky = qc.createLinearGradient(0, 0, 0, 110);
+  sky.addColorStop(0, tRgb(tMix(tMix([90, 150, 214], [80, 60, 130], dusk), [8, 10, 34], night))); sky.addColorStop(1, tRgb(tMix(tMix([206, 232, 240], [248, 170, 110], dusk), [26, 30, 70], night)));
+  qc.fillStyle = sky; qc.fillRect(0, 0, QW, QH);
+  if (night) for (let i = 0; i < 90; i++) { qc.globalAlpha = night * (.4 + .6 * Math.abs(Math.sin(t * .6 + i))); vR('#fff', (i * 37.3) % QW, (i * 23.7) % 90, 1, 1); } qc.globalAlpha = 1;
+  const arc = clamp(ph / .8), sx = 30 + arc * 260, sy = 90 - Math.sin(arc * Math.PI) * 74;
+  if (!night) { qc.fillStyle = '#fff0b8'; qc.beginPath(); qc.arc(sx, sy, 10, 0, 7); qc.fill(); } else { qc.fillStyle = '#f0ecd8'; qc.beginPath(); qc.arc(232, 34, 9, 0, 7); qc.fill(); }
+  for (let i = 0; i < 5; i++) { const x = ((i * 91 - t * 2 - Hike.S * .03) % (QW + 80) + QW + 80) % (QW + 80) - 40; qc.globalAlpha = night ? .1 : .7; qOval(x, 18 + (i * 11) % 30, 26, 6, '#fff'); qOval(x + 12, 14 + (i * 11) % 30, 16, 5, '#fff'); } qc.globalAlpha = 1;
+  tLand(x => -34 - Math.abs(Math.sin(x * .013)) * 26 - Math.sin(x * .04) * 6, 112, shade(tMix(mix(1), [150, 170, 200], .6)), Hike.S * .05);
+  tLand(x => -24 - Math.sin(x * .02) * 12 - Math.sin(x * .07) * 3, 120, shade(tMix(mix(0), [120, 150, 170], .25)), Hike.S * .14);
+  tLand(x => -16 - Math.sin(x * .03) * 8, 128, shade(mix(1)), Hike.S * .35);
+  const near = Hike.S * .35, nearK = i => tHash(i, 2);
+  for (let i = Math.floor(near / 30); i * 30 - near < QW + 20; i++) {
+    const x = i * 30 - near, y = 124 - Math.sin((x + near) * .03) * 8;
+    if (kind === 'pine' && nearK(i) < .8) { const h = 30 + tHash(i, 3) * 26; qPoly([[x - 10, y], [x, y - h], [x + 10, y]], shade(tMix(mix(1), [14, 40, 30], .65))); }
+    if (kind === 'round' && nearK(i) < .8) { vR(shade([70, 50, 40]), x - 1, y - 14, 3, 16); qOval(x, y - 22, 13, 13, shade(tMix(mix(1), mix(0), tHash(i, 4)))); }
+    if (kind === 'rock' && nearK(i) < .5) qOval(x, y, 12, 8, shade([120, 116, 120]));
+    if (kind === 'reed') { qc.fillStyle = shade([90, 150, 176]); qc.fillRect(x - 15, y - 4, 31, 12); vR(shade([200, 226, 240]), x, y - 1, 8, 1); }
+  }
+  const front = Hike.S, ground = 150;
+  qc.fillStyle = shade(mix(2)); qc.fillRect(0, 132, QW, 48);
+  for (let i = 0; i < 90; i++) vR(shade(tMix(mix(2), [255, 255, 255], .18)), ((i * 37 - front) % QW + QW) % QW, 134 + (i * 7) % 44, 2, 1);
+  vR(shade([190, 160, 118]), 0, 146, QW, 12);
+  for (let i = 0; i < 40; i++) vR(shade([160, 130, 96]), ((i * 41 - front) % QW + QW) % QW, 148 + (i % 4) * 2.4, 3, 1);
+  if (kind === 'flower') for (let i = 0; i < 44; i++) vR(shade(tHex(['#f06a90', '#f0d050', '#fff', '#b070e0'][i & 3])), ((i * 29 - front * .9) % QW + QW) % QW, 134 + (i * 3) % 10, 2, 2);
+  if (Hike.animal) wAnimal(Hike.animal, Hike.animal.x, 146, t);
+  const hx = 120, bob = Hike.sp > .2 ? Math.round(Math.abs(Math.sin(t * 6)) * 1.5) : 0, stepA = Hike.sp > .2 ? Math.floor(t * 7) % 2 : 0;
+  if (Hike.camp) {
+    const tx = 170;
+    qPoly([[tx - 26, 152], [tx, 118], [tx + 26, 152]], shade([200, 120, 60])); qPoly([[tx - 8, 152], [tx, 128], [tx + 8, 152]], shade([60, 40, 34]));
+    const fx = 92;
+    vR(shade([90, 60, 40]), fx - 8, 153, 16, 3);
+    for (let i = 0; i < 5; i++) { const fh = 8 + Math.sin(t * 9 + i * 2) * 3 + (2 - Math.abs(i - 2)) * 3; vR(i % 2 ? '#ffd24a' : '#ff7a1e', fx - 6 + i * 2.5, 153 - fh, 3, fh); }
+    if (SHOW.effects) { for (let i = 0; i < 8; i++) { const q = (t * .4 + i / 8) % 1; vR('#ffb040', fx + Math.sin(q * 9 + i) * 6, 140 - q * 50, 1, 1); } }
+    vR('#3e62a0', 116, 134, 8, 14); vR('#ecc4a2', 117, 126, 6, 7); vR('#c84a3a', 116, 124, 7, 4); vR('#3a3048', 110, 146, 14, 5);
+    if (SHOW.pets) { vR('#b8895a', 134, 148, 12, 4); vR('#b8895a', 144, 145, 5, 4); }
+    if (night && SHOW.lights) { qc.fillStyle = `rgba(6,8,30,${night * .3})`; qc.fillRect(0, 0, QW, QH); qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = night * .7; qc.drawImage(qTint('#ff9a40'), fx - 80, 80, 160, 100); qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over'; }
+  } else {
+    vR('#c8503c', hx - 7, 120 - bob, 7, 15); vR('#a83a2c', hx - 7, 118 - bob, 7, 3);
+    vR('#3a3048', hx - 3, 137, 3, 13 - stepA); vR('#3a3048', hx + 1, 137, 3, 12 + stepA); vR('#4a6a4a', hx - 3, 123 - bob, 7, 15); vR('#ecc4a2', hx - 2, 113 - bob, 6, 9); vR('#6a4426', hx - 5, 112 - bob, 12, 2); vR('#6a4426', hx - 3, 108 - bob, 8, 4); vR('#8a6a40', hx + 7, 122 - bob, 1, 28);
+    if (t < Hike.sketch) { vR('#f4efe0', hx + 3, 124, 8, 6); vR('#ecc4a2', hx + 2, 126, 3, 2); }
+    if (SHOW.pets) { const dx = 96 + Math.sin(t * .7) * 6, h2 = Hike.sp > .2 ? Math.round(Math.abs(Math.sin(t * 9))) : 0; vR('#b8895a', dx - 5, 143 - h2, 11, 5); vR('#b8895a', dx + 5, 139 - h2, 5, 5); vR('#7a5a34', dx + 5, 139 - h2, 2, 4); vR('#b8895a', dx - 7, 141 - h2 + Math.round(Math.sin(t * 12)), 2, 2); vR('#b8895a', dx - 4, 148, 2, 2 - h2); vR('#b8895a', dx + 3, 148, 2, 2 - h2); }
+  }
+  if (SHOW.effects && (m > .5 ? Hike.nextBiome : Hike.biome) === 5) for (let i = 0; i < 70; i++) vR('#fff', (i * 41.3 + Math.sin(t + i) * 6 - Hike.S * .4 + 9000) % QW, (t * 16 + i * 13.7) % 160, 1, 1);
+  if (SHOW.effects && dusk && !night) for (let i = 0; i < 9; i++) if (Math.sin(t * 3 + i) > .2) vR('#e8ff90', (i * 53 + Math.sin(t * .4 + i) * 14) % QW, 120 + (i * 13) % 30, 1, 1);
+  const ui = cozyPresent();
+  if (SHOW.stats) {
+    ui.win(3, 3, 132, 17);
+    ui.text(`DAY ${Hike.days}  ${Hike.km.toFixed(1)} KM`, 7, 10, 7.5, '#8a3a2a');
+    ui.text(`${(m > .5 ? b : a)[0]}  ${Hike.book.length}/${W_ANIMALS.length} SKETCHED`, 7, 17, 6.5);
+  }
+  if (t > Hike.nextNews) { Hike.news = cozyLine('traillog', { biome: (m > .5 ? b : a)[0].toLowerCase(), km: Hike.km.toFixed(1) }); Hike.nextNews = t + rnd(15, 22); }
+  cozyPanels(ui, W, 'FIELD NOTES', t);
+}
+
+/* TINY TERRARIUM: a little ecosystem of grass, rabbits, foxes and trees. */
+const E_SAVE = 'winvamp.terrarium', E_W = 38, E_H = 19, E_T = 8;
+const E = { ready: false, grass: [], rabbits: [], foxes: [], trees: [], born: 0, seasons: 0, year: 0, hist: [], histAt: 0, news: '', nextNews: 5, banner: null, saveAt: 0, t: 0, bugs: [], grid: null };
+const eAt = (x, y) => clamp(Math.floor((x - 8) / E_T), 0, E_W - 1) + clamp(Math.floor((y - 12) / E_T), 0, E_H - 1) * E_W;
+function eBeast(x, y, kind) { return { x, y, tx: x, ty: y, e: rnd(.5, 1), kind, age: 0, ph: rnd(0, 7) }; }
+function eStart() {
+  let saved = null;
+  try { saved = JSON.parse(store.get(E_SAVE) || 'null'); } catch {}
+  E.born = saved?.born || 0; E.year = saved?.year || 0;
+  E.grass = Array.from({ length: E_W * E_H }, () => rnd(.2, 1));
+  E.trees = saved?.trees || Array.from({ length: 9 }, () => ({ x: rnd(20, 300), y: rnd(30, 150), g: rnd(.3, 1) }));
+  for (const [cx, cy, r] of [[230, 120, 20]]) E.pond = [cx, cy, r];
+  E.rabbits = Array.from({ length: 12 }, () => eBeast(rnd(30, 290), rnd(30, 150), 'r'));
+  E.foxes = Array.from({ length: 2 }, () => eBeast(rnd(30, 290), rnd(30, 150), 'f'));
+  E.bugs = Array.from({ length: 8 }, () => ({ x: rnd(20, 300), y: rnd(20, 150), ph: rnd(0, 7), c: ['#f0a0c8', '#f0d060', '#a0c8f0'][Math.floor(rnd(0, 3))] }));
+  E.ready = true;
+}
+function eSave() { store.set(E_SAVE, JSON.stringify({ born: E.born, year: E.year, trees: E.trees })); }
+function eWander(b, reach) { for (let i = 0; i < 8; i++) { const x = clamp(b.x + rnd(-reach, reach), 18, 302), y = clamp(b.y + rnd(-reach, reach), 22, 156); if (Math.hypot(x - E.pond[0], (y - E.pond[1]) * 1.4) > E.pond[2] + 6) { b.tx = x; b.ty = y; return; } } }
+
+function eUpdate(t, dt) {
+  E.t = t;
+  const season = Math.floor(t / 90) % 4, regrow = [.09, .07, .04, .012][season];
+  E.season = season;
+  if (Math.floor(t / 360) !== E.yearMark) { if (E.yearMark !== undefined) { E.year++; eSave(); E.banner = { text: `YEAR ${E.year}`, at: t }; } E.yearMark = Math.floor(t / 360); }
+  for (let i = 0; i < E.grass.length; i++) E.grass[i] = Math.min(1, E.grass[i] + dt * regrow);
+  const move = (b, sp) => { const d = Math.hypot(b.tx - b.x, b.ty - b.y), step = sp * dt; if (d <= step) { b.x = b.tx; b.y = b.ty; return true; } b.x += (b.tx - b.x) / d * step; b.y += (b.ty - b.y) / d * step; b.flip = b.tx < b.x; return false; };
+  for (const r of E.rabbits) {
+    r.age += dt; r.e -= dt * .022;
+    const ix = eAt(r.x, r.y);
+    if (E.grass[ix] > .25) { const eat = Math.min(E.grass[ix], dt * .6); E.grass[ix] -= eat; r.e = Math.min(1.4, r.e + eat * .32); }
+    const fox = E.foxes.find(f => Math.hypot(f.x - r.x, f.y - r.y) < 34);
+    if (fox) { r.tx = clamp(r.x + (r.x - fox.x) * 1.5, 18, 302); r.ty = clamp(r.y + (r.y - fox.y) * 1.5, 22, 156); }
+    if (move(r, fox ? 32 : 12)) eWander(r, 24);
+    if (r.e > 1.1 && E.rabbits.length < 34 && Math.random() < dt * .1) { r.e -= .5; const kid = eBeast(r.x, r.y, 'r'); eWander(kid, 20); E.rabbits.push(kid); E.born++; }
+  }
+  for (const f of E.foxes) {
+    f.age += dt; f.e -= dt * .018;
+    const prey = E.rabbits.reduce((best, r) => { const d = Math.hypot(f.x - r.x, f.y - r.y); return d < (best?.d ?? 90) ? { r, d } : best; }, null);
+    if (prey && f.e < .95) { f.tx = prey.r.x; f.ty = prey.r.y; move(f, 25); if (prey.d < 5) { prey.r.gone = true; f.e = Math.min(1.5, f.e + .55); } } else if (move(f, 11)) eWander(f, 40);
+    if (f.e > 1.25 && E.foxes.length < 6 && Math.random() < dt * .03) { f.e -= .6; E.foxes.push(eBeast(f.x, f.y, 'f')); E.born++; E.news = 'Fox cubs have been spotted near the old log.'; E.nextNews = t + 15; }
+  }
+  E.rabbits = E.rabbits.filter(r => !r.gone && r.e > 0 && r.age < 240);
+  E.foxes = E.foxes.filter(f => f.e > 0 && f.age < 420);
+  if (E.rabbits.length < 4) { for (let i = 0; i < 4; i++) E.rabbits.push(eBeast(20, rnd(40, 140), 'r')); E.news = 'A family of rabbits has wandered in from somewhere.'; E.nextNews = t + 15; }
+  if (!E.foxes.length && E.rabbits.length > 14) { E.foxes.push(eBeast(300, rnd(40, 140), 'f')); E.news = 'A lone fox appears at the edge of the glass.'; E.nextNews = t + 15; }
+  for (const tr of E.trees) tr.g = Math.min(1, tr.g + dt * .004);
+  if (Math.random() < dt * .012 && E.trees.length < 16) { const p = E.trees[Math.floor(rnd(0, E.trees.length))]; if (p.g > .7) { E.trees.push({ x: clamp(p.x + rnd(-40, 40), 20, 300), y: clamp(p.y + rnd(-30, 30), 30, 150), g: .05 }); E.news = 'A sapling has come up where nobody planted it.'; E.nextNews = t + 15; eSave(); } }
+  if (Math.random() < dt * .004 && E.trees.length > 6) { E.trees.splice(Math.floor(rnd(0, E.trees.length)), 1); E.news = 'An old tree has fallen. The beetles are delighted.'; E.nextNews = t + 15; }
+  if (t > E.histAt) { E.histAt = t + 3; E.hist.push([E.rabbits.length, E.foxes.length]); if (E.hist.length > 60) E.hist.shift(); }
+  if (t > E.saveAt) { E.saveAt = t + 20; eSave(); }
+}
+
+function drawTerrarium(t, dt) {
+  if (!E.ready) eStart();
+  eUpdate(t, dt);
+  const season = E.season, night = (Math.sin(t / 60) + 1) / 2 > .78 ? clamp(((Math.sin(t / 60) + 1) / 2 - .78) / .1) : 0, rich = V_GRASS[season][0], lean = season === 3 ? '#c8ccd0' : '#a89a60';
+  qc.fillStyle = '#20281e'; qc.fillRect(0, 0, QW, QH);
+  const A1 = tHex(rich), B1 = tHex(lean);
+  for (let y = 0; y < E_H; y++) for (let x = 0; x < E_W; x++) {
+    const g = E.grass[x + y * E_W], px = 8 + x * E_T, py = 12 + y * E_T;
+    vR(tRgb(tMix(B1, A1, g)), px, py, E_T, E_T);
+    if (g > .6 && (x * 7 + y * 3) % 3 === 0) { const sway = Math.round(Math.sin(t + x + y) * .7); vR('rgba(0,60,20,.28)', px + 2 + sway, py + 1, 1, 4); vR('rgba(0,60,20,.28)', px + 5 + sway, py + 3, 1, 3); }
+    if (season < 2 && g > .85 && (x * 13 + y * 5) % 11 === 0) vR(['#fff', '#f0d060', '#f0a0c8'][(x + y) % 3], px + 3, py + 3, 2, 2);
+  }
+  const [px, py, pr] = E.pond;
+  qOval(px, py, pr + 2, (pr + 2) * .7, '#8a7a50'); qOval(px, py, pr, pr * .7, season === 3 ? '#c8e0ec' : '#4a96b8');
+  if (season < 3) { vR('rgba(255,255,255,.6)', px - 8 + Math.sin(t) * 2, py - 3, 6, 1); vR('rgba(255,255,255,.5)', px + 2, py + 4 + Math.sin(t * 1.2), 7, 1); qOval(px + 7, py - 5, 3, 2, '#3e8a4a'); }
+  qOval(70, 42, 16, 7, '#7a6a5a'); vR('#5a3a22', 96, 136, 26, 6); vR('#7a5230', 96, 136, 26, 2); qOval(122, 139, 3, 3, '#a87a4a'); qOval(250, 44, 11, 7, '#8a8a8e');
+  const items = [];
+  E.trees.forEach(tr => items.push([tr.y, () => { const s = .4 + tr.g * .9, leaf = V_LEAVES[season][Math.floor(tr.x) % 3]; vR('rgba(0,0,0,.18)', tr.x - 8 * s, tr.y, 16 * s, 3); vR('#5a3a20', tr.x - 1, tr.y - 8 * s, 3, 9 * s); qOval(tr.x, tr.y - 15 * s, 11 * s, 11 * s, leaf); qOval(tr.x + 3 * s, tr.y - 19 * s, 6 * s, 6 * s, 'rgba(255,255,255,.14)'); }]));
+  E.rabbits.forEach(r => items.push([r.y, () => { const x = Math.round(r.x), y = Math.round(r.y), d = r.flip ? -1 : 1, hop = Math.round(Math.abs(Math.sin(t * 8 + r.ph))); vR('rgba(0,0,0,.2)', x - 3, y + 1, 7, 1); vR('#e4dccc', x - 3, y - 3 - hop, 6, 4); vR('#e4dccc', x + d * 3 - (d < 0 ? 1 : 0), y - 5 - hop, 3, 3); vR('#e4dccc', x + d * 3, y - 8 - hop, 1, 3); vR('#fff', x - d * 3, y - 3 - hop, 1, 1); }]));
+  E.foxes.forEach(f => items.push([f.y, () => { const x = Math.round(f.x), y = Math.round(f.y), d = f.flip ? -1 : 1, st = Math.floor(t * 7 + f.ph) % 2; vR('rgba(0,0,0,.2)', x - 6, y + 1, 12, 1); vR('#d8702a', x - 5, y - 5, 10, 4); vR('#d8702a', x + d * 5 - (d < 0 ? 2 : 0), y - 8, 4, 4); vR('#d8702a', x + d * 5, y - 10, 1, 2); vR('#fff', x + d * 6 - (d < 0 ? 1 : 0), y - 6, 2, 1); vR('#d8702a', x - d * 8 - 1, y - 5, 4, 2); vR('#fff', x - d * 10 - 1, y - 5, 2, 2); vR('#3a2418', x - 3, y - 1, 1, 2 - st); vR('#3a2418', x + 3, y - 1, 1, 1 + st); }]));
+  items.sort((a, b) => a[0] - b[0]).forEach(i => i[1]());
+  if (SHOW.effects) {
+    E.bugs.forEach(b => { const x = b.x + Math.sin(t * .7 + b.ph) * 20, y = b.y + Math.cos(t * .9 + b.ph) * 12, f = Math.sin(t * 12 + b.ph) > 0 ? 2 : 1; if (season < 3) { vR(b.c, x - f, y, f, 2); vR(b.c, x + 1, y, f, 2); } });
+    if (season === 3) for (let i = 0; i < 50; i++) vR('#fff', 8 + (i * 41.3 + Math.sin(t + i) * 5) % 304, 12 + (t * 12 + i * 13) % 152, 1, 1);
+    if (season === 2) for (let i = 0; i < 16; i++) vR(['#c8642a', '#d8a030'][i & 1], 8 + (i * 47 + t * 7) % 304, 12 + (t * 11 + i * 19) % 152, 2, 1);
+  }
+  if (night && SHOW.lights) { qc.fillStyle = `rgba(10,14,44,${night * .58})`; qc.fillRect(0, 0, QW, QH); if (SHOW.effects) for (let i = 0; i < 18; i++) if (Math.sin(t * 2 + i * 2) > 0) vR('#e8ff90', (i * 47 + Math.sin(t * .4 + i) * 14 + 14) % QW, (i * 37 + Math.cos(t * .5 + i) * 10 + 14) % 160, 1, 1); }
+  qc.lineWidth = 8; qc.strokeStyle = '#141c18'; qc.strokeRect(4, 4, QW - 8, QH - 8);
+  qc.strokeStyle = 'rgba(190,230,226,.5)'; qc.lineWidth = 2; qc.strokeRect(8, 8, QW - 16, QH - 16);
+  qPoly([[30, 12], [62, 12], [14, 90], [10, 60]], 'rgba(255,255,255,.08)'); qPoly([[280, 170], [300, 170], [312, 120], [312, 96]], 'rgba(255,255,255,.06)');
+  const ui = cozyPresent();
+  if (SHOW.stats) {
+    ui.win(3, 3, 130, 19);
+    ui.text(`YEAR ${E.year}  ${V_SEASONS[season]}`, 7, 10, 7, '#8a3a2a');
+    ui.text(`${E.rabbits.length} RABBITS  ${E.foxes.length} FOXES  ${E.trees.length} TREES`, 7, 18, 6.3);
+    E.hist.forEach(([r, f], i) => { c.fillStyle = '#b8a888'; c.fillRect(ui.ox + ui.P(86 + i * .75), ui.oy + ui.P(11 - r * .2), ui.P(.7), ui.P(r * .2)); c.fillStyle = '#d8702a'; c.fillRect(ui.ox + ui.P(86 + i * .75), ui.oy + ui.P(11 - f * .9), ui.P(.7), ui.P(.6)); });
+  }
+  if (t > E.nextNews) { E.news = cozyLine('terralog', { born: E.born, season: V_SEASONS[season].toLowerCase() }); E.nextNews = t + rnd(15, 22); }
+  cozyPanels(ui, E, 'FIELD LOG', t);
+}
+
+/* BACKYARD OBSERVATORY: one night of stargazing after another, written in a log. */
+const O_SAVE = 'winvamp.observatory';
+const O_TARGETS = ['THE MOON', 'SATURN', 'JUPITER', 'MARS', 'ORION NEBULA', 'ANDROMEDA', 'PLEIADES', 'DOUBLE STAR', 'RING NEBULA', 'GLOBULAR CLUSTER', 'A COMET', 'NEPTUNE'];
+const O = { ready: false, nights: 0, log: [], cons: [], target: 0, until: 14, nextEvent: 20, meteors: [], comet: null, sat: null, shower: 0, time: 0, news: '', nextNews: 5, banner: null, saveAt: 0, t: 0, charted: 0, stars: [] };
+function oConstellations() {
+  const list = [];
+  for (let i = 0; i < 7; i++) {
+    const n = 4 + Math.floor(rnd(0, 4)), cx = rnd(30, 620), cy = rnd(20, 90), pts = [];
+    let x = cx, y = cy;
+    for (let k = 0; k < n; k++) { pts.push([x, y]); x += rnd(-22, 26); y = clamp(y + rnd(-14, 14), 12, 104); }
+    list.push({ name: chatExpand('constel'), pts, drawn: 0, cx, cy });
+  }
+  return list;
+}
+function oStart() {
+  let saved = null;
+  try { saved = JSON.parse(store.get(O_SAVE) || 'null'); } catch {}
+  Object.assign(O, { nights: saved?.nights || 0, log: saved?.log || [], charted: saved?.charted || 0, time: saved?.time || 0, ready: true });
+  O.cons = oConstellations();
+  O.stars = Array.from({ length: 240 }, () => ({ x: rnd(0, 640), y: rnd(0, 110), s: Math.random() < .12 ? 2 : 1, ph: rnd(0, 7), c: ['#fff', '#ffe8c8', '#c8dcff'][Math.floor(rnd(0, 3))] }));
+}
+function oSave() { store.set(O_SAVE, JSON.stringify({ nights: O.nights, log: O.log, charted: O.charted, time: O.time })); }
+function oUpdate(t, dt) {
+  O.t = t; const before = Math.floor(O.time / 420); O.time += dt;
+  if (Math.floor(O.time / 420) !== before) { O.nights++; O.cons = oConstellations(); O.banner = { text: `NIGHT ${O.nights + 1}`, at: t }; oSave(); }
+  if (t > O.until) {
+    const name = O_TARGETS[O.target = Math.floor(rnd(0, O_TARGETS.length))];
+    if (!O.log.includes(name)) { O.log.push(name); O.banner = { text: `LOGGED: ${name}`, at: t + 1 }; }
+    O.until = t + rnd(18, 34);
+    const open = O.cons.find(k => k.drawn < k.pts.length);
+    if (open) open.active = true;
+    oSave();
+  }
+  for (const k of O.cons) if (k.active && k.drawn < k.pts.length) { k.drawn += dt * .5; if (k.drawn >= k.pts.length) { k.drawn = k.pts.length; k.active = false; O.charted++; O.news = `Charted a new constellation: ${k.name}.`; O.nextNews = t + 15; } }
+  if (t > O.nextEvent) {
+    const roll = Math.random();
+    if (roll < .35) { O.shower = t + 24; O.news = 'A meteor shower! The thermos is abandoned.'; O.nextNews = t + 15; }
+    else if (roll < .6) { O.comet = { at: t, y: rnd(20, 60) }; O.news = 'A comet! It will not be back for 300 years, apparently.'; O.nextNews = t + 15; }
+    else O.sat = { at: t, y: rnd(16, 70) };
+    O.nextEvent = t + rnd(35, 80);
+  }
+  if ((t < O.shower ? Math.random() < dt * 2.4 : Math.random() < dt * .1)) O.meteors.push({ x: rnd(20, 300), y: rnd(8, 60), life: 1 });
+  O.meteors.forEach(m => { m.x -= dt * 150; m.y += dt * 70; m.life -= dt * 2; });
+  O.meteors = O.meteors.filter(m => m.life > 0);
+  if (t > O.saveAt) { O.saveAt = t + 20; oSave(); }
+}
+
+function oView(t) {
+  const cx = 262, cy = 62, r = 44, name = O_TARGETS[O.target];
+  qc.fillStyle = '#14141c'; qc.beginPath(); qc.arc(cx, cy, r + 4, 0, 7); qc.fill();
+  qc.save(); qc.beginPath(); qc.arc(cx, cy, r, 0, 7); qc.clip();
+  qc.fillStyle = '#04050e'; qc.fillRect(cx - r, cy - r, r * 2, r * 2);
+  for (let i = 0; i < 40; i++) vR('#d8e0f0', cx - r + (i * 37 + t) % (r * 2), cy - r + (i * 23) % (r * 2), 1, 1);
+  const dx = Math.sin(t * .12) * 3, x = cx + dx, y = cy;
+  if (name === 'THE MOON') { qOval(x, y, 30, 30, '#d8d4c4'); for (const [a, b, s] of [[-10, -8, 6], [8, 4, 8], [-4, 14, 4], [14, -14, 3]]) qOval(x + a, y + b, s, s, '#b8b4a4'); }
+  else if (name === 'SATURN') { qOval(x, y, 15, 12, '#e0c88a'); vR('#c8a868', x - 15, y - 3, 30, 2); qc.strokeStyle = '#d8d0b0'; qc.lineWidth = 3; qc.beginPath(); qc.ellipse(x, y, 27, 7, -.25, 0, 7); qc.stroke(); }
+  else if (name === 'JUPITER') { qOval(x, y, 21, 19, '#d8b88a'); for (const b of [-9, -2, 6]) vR('#a8784a', x - 20, y + b, 40, 3); qOval(x + 8, y + 7, 4, 3, '#c85a3a'); [-32, -26, 28, 34].forEach(a => vR('#fff', x + a, y, 2, 2)); }
+  else if (name === 'MARS') { qOval(x, y, 16, 16, '#c8603a'); qOval(x, y - 13, 6, 3, '#f4f0e8'); qOval(x + 4, y + 3, 6, 4, '#a0482a'); }
+  else if (name === 'NEPTUNE') qOval(x, y, 13, 13, '#4a78d8');
+  else if (name === 'A COMET') { qOval(x + 12, y - 10, 4, 4, '#e8f4ff'); qPoly([[x + 12, y - 13], [x + 15, y - 8], [x - 30, y + 22]], 'rgba(170,220,255,.5)'); }
+  else if (name === 'RING NEBULA') { qc.strokeStyle = '#78c8a8'; qc.lineWidth = 7; qc.beginPath(); qc.ellipse(x, y, 16, 12, .3, 0, 7); qc.stroke(); qc.strokeStyle = '#d87a8a'; qc.lineWidth = 2; qc.stroke(); }
+  else if (name === 'ANDROMEDA') { qc.globalCompositeOperation = 'lighter'; qc.save(); qc.translate(x, y); qc.rotate(-.5); qc.scale(1.5, .5); qc.drawImage(qTint('#c8c0ff'), -30, -30, 60, 60); qc.restore(); qc.drawImage(qTint('#fff0d0'), x - 10, y - 10, 20, 20); qc.globalCompositeOperation = 'source-over'; }
+  else if (name === 'ORION NEBULA') { qc.globalCompositeOperation = 'lighter'; qc.drawImage(qTint('#e070a0'), x - 34, y - 28, 58, 58); qc.drawImage(qTint('#60c8d0'), x - 16, y - 24, 52, 52); qc.globalCompositeOperation = 'source-over'; for (const [a, b] of [[0, 0], [3, 2], [-2, 3], [2, -2]]) vR('#fff', x + a, y + b, 1, 1); }
+  else { const n = name === 'DOUBLE STAR' ? 2 : name === 'PLEIADES' ? 9 : 90; for (let i = 0; i < n; i++) { const a = i * 2.4, q = name === 'GLOBULAR CLUSTER' ? Math.sqrt(i) * 2.4 : name === 'DOUBLE STAR' ? 5 : 8 + i * 3; vR(name === 'DOUBLE STAR' && i ? '#ffc070' : '#d8e8ff', x + Math.cos(a) * q, y + Math.sin(a) * q, 2, 2); } }
+  qc.restore();
+  qc.strokeStyle = '#3a3a48'; qc.lineWidth = 2; qc.beginPath(); qc.arc(cx, cy, r + 3, 0, 7); qc.stroke();
+}
+
+function drawObservatory(t, dt) {
+  if (!O.ready) oStart();
+  oUpdate(t, dt);
+  const ph = (O.time / 420) % 1, dawn = ph > .9 ? (ph - .9) / .1 : ph < .06 ? 1 - ph / .06 : 0, turn = ((O.time % 420) * .22);
+  const sky = qc.createLinearGradient(0, 0, 0, 130);
+  sky.addColorStop(0, tRgb(tMix([6, 8, 26], [44, 62, 118], dawn))); sky.addColorStop(1, tRgb(tMix([22, 26, 62], [232, 150, 120], dawn)));
+  qc.fillStyle = sky; qc.fillRect(0, 0, QW, QH);
+  qc.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 16; i++) { const x = (i * 44 - turn) % 640 + 100; qc.globalAlpha = .1; qc.drawImage(qTint('#8a90c8'), x - 40, 66 - i * 3 + Math.sin(i) * 12 - 40, 80, 80); }
+  qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over';
+  const sx = x => ((x - turn) % 640 + 640) % 640 - 150;
+  for (const s of O.stars) { const x = sx(s.x); if (x < -2 || x > QW) continue; qc.globalAlpha = (1 - dawn) * (.5 + .5 * Math.abs(Math.sin(t * .8 + s.ph))); vR(s.c, x, s.y, s.s, s.s); }
+  qc.globalAlpha = 1;
+  for (const k of O.cons) {
+    const seen = Math.floor(k.drawn);
+    qc.strokeStyle = 'rgba(140,190,255,.7)'; qc.lineWidth = 1;
+    k.pts.forEach(([x, y], i) => {
+      const px = sx(x), wrap = px < -60;
+      if (i < k.pts.length) { vR(i < k.drawn ? '#ffe8a0' : '#fff', px - 1, y - 1, 3, 3); }
+      if (i > 0 && i <= seen + 1 && i < k.pts.length && !wrap) { const f = clamp(k.drawn - i + 1), [ax, ay] = k.pts[i - 1], bx = sx(ax); if (Math.abs(px - bx) < 90) { qc.beginPath(); qc.moveTo(bx, ay); qc.lineTo(bx + (px - bx) * f, ay + (y - ay) * f); qc.stroke(); } }
+    });
+    k.sx = sx(k.pts[0][0]);
+  }
+  qc.fillStyle = '#ecead8'; qc.beginPath(); qc.arc(40 + ph * 160, 30 + Math.abs(ph - .5) * 40, 8, 0, 7); qc.fill(); qOval(44 + ph * 160, 28 + Math.abs(ph - .5) * 40, 2, 2, '#c8c6b6');
+  for (const m of O.meteors) { qc.strokeStyle = `rgba(255,255,255,${m.life})`; qc.lineWidth = 1; qc.beginPath(); qc.moveTo(m.x, m.y); qc.lineTo(m.x + 16, m.y - 8); qc.stroke(); }
+  if (O.comet) { const a = (t - O.comet.at) / 26, x = 340 - a * 400, y = O.comet.y + a * 20; if (a > 1) O.comet = null; else { qOval(x, y, 2, 2, '#e8f4ff'); qPoly([[x, y - 2], [x, y + 2], [x + 44, y - 12]], 'rgba(170,220,255,.45)'); } }
+  if (O.sat) { const a = (t - O.sat.at) / 16; if (a > 1) O.sat = null; else if (Math.sin(t * 4) > -.6) vR('#fff', -10 + a * 340, O.sat.y + a * 12, 1, 1); }
+  const f = tRgb(tMix([10, 12, 22], [40, 40, 60], dawn)), g = tRgb(tMix([16, 22, 28], [50, 70, 60], dawn));
+  tLand(x => -8 - Math.sin(x * .02) * 6 - Math.abs(Math.sin(x * .06)) * 7, 130, f, 0);
+  vTreeNight(26, 132, 40, f); vTreeNight(300, 134, 30, f);
+  vR(f, 0, 134, QW, 46); vR(g, 0, 146, QW, 34);
+  for (let x = 0; x < QW; x += 10) { vR(f, x, 122, 6, 26); vR(f, x + 1, 120, 4, 2); } vR(f, 0, 128, QW, 2); vR(f, 0, 140, QW, 2);
+  vR(f, 196, 86, 124, 62); qPoly([[188, 86], [258, 54], [328, 86]], f); vR('#ffd878', 214, 104, 16, 16); vR(f, 221, 104, 2, 16); vR(f, 214, 111, 16, 2); vR('#ffc060', 272, 112, 12, 36);
+  qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = .3; qc.drawImage(qTint('#ffb860'), 180, 76, 90, 90); qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over';
+  const sweep = Math.sin(t * .1) * .05, tx = 122, ty = 118;
+  qc.strokeStyle = '#3a3a48'; qc.lineWidth = 2; qc.beginPath(); qc.moveTo(tx, ty + 8); qc.lineTo(tx - 12, 160); qc.moveTo(tx, ty + 8); qc.lineTo(tx + 12, 160); qc.moveTo(tx, ty + 8); qc.lineTo(tx, 162); qc.stroke();
+  qc.save(); qc.translate(tx, ty); qc.rotate(-.72 + sweep); vR('#d8d8e0', -30, -5, 58, 10); vR('#a8a8b8', -32, -6, 5, 12); vR('#20202a', 24, -6, 6, 12); vR('#7a7a8a', -8, -5, 3, 10); qc.restore();
+  const px = 92, py = 160, peek = (t % 11) < 6;
+  vR('#2a3a5a', px - 5, py - 16, 5, 16); vR('#2a3a5a', px, py - 16, 5, 16); vR('#5a4a6a', px - 6, py - 36, 12, 21); vR('#c84a3a', px - 6, py - 37, 12, 4); vR('#c8a488', px - 3, py - 46, 8, 9); vR('#c84a3a', px - 4, py - 49, 10, 5); vR('#f0ece0', px - 1, py - 51, 3, 2); vR('#5a4a6a', px + 5, py - 34, 10, 4);
+  if (!peek) vR('#c8a488', px + 14, py - 34, 3, 4);
+  vR('#7a4a2a', 58, 148, 22, 2); vR('#7a4a2a', 60, 150, 2, 12); vR('#7a4a2a', 76, 150, 2, 12); vR('#c8c8d0', 64, 139, 6, 9); vR('#e0d8c8', 72, 145, 6, 3);
+  if (SHOW.effects) vSmoke(66, 138, t, 2);
+  if (SHOW.pets) { vR('#3a3430', 36, 152, 14, 5); vR('#3a3430', 47, 149, 5, 5); }
+  if (SHOW.effects) { for (let i = 0; i < 8; i++) if (Math.sin(t * 2 + i * 2) > .1) vR('#e8ff90', (i * 47 + Math.sin(t * .4 + i) * 12) % 180, 136 + (i * 7) % 28, 1, 1); }
+  oView(t);
+  if (dawn > .05) { qc.fillStyle = `rgba(255,170,120,${dawn * .1})`; qc.fillRect(0, 0, QW, QH); }
+  const ui = cozyPresent();
+  ui.text(O_TARGETS[O.target], 262, 118, 7, '#d8e4ff', 'center');
+  for (const k of O.cons) if (k.drawn >= 1 && k.sx > 6 && k.sx < 190) ui.text(k.name, k.sx, Math.max(8, k.pts[0][1] - 4), 5.4, 'rgba(190,214,255,.8)');
+  if (SHOW.stats) {
+    ui.win(3, 3, 136, 17);
+    ui.text(`NIGHT ${O.nights + 1}`, 7, 10, 7.5, '#8a3a2a');
+    ui.text(`${O.log.length}/${O_TARGETS.length} OBSERVED  ${O.charted} CHARTED`, 7, 17, 6.5);
+  }
+  if (t > O.nextNews) { O.news = cozyLine('obslog', { target: O_TARGETS[O.target].toLowerCase() }); O.nextNews = t + rnd(15, 22); }
+  cozyPanels(ui, O, 'OBSERVING LOG', t);
+}
+function vTreeNight(x, y, h, col) { vR(col, x - 2, y - h * .4, 4, h * .4 + 4); qOval(x, y - h * .7, h * .5, h * .5, col); qOval(x - h * .3, y - h * .45, h * .34, h * .34, col); qOval(x + h * .3, y - h * .5, h * .34, h * .34, col); }
+
 const CLASSICS = [
   ['SWIRL', drawSwirl, 'classics'], ['BARS', drawSpectrum, 'classics'], ['PLASMA', drawPlasma, 'classics'], ['KALEIDO', drawKaleido, 'classics'], ['SCOPE', drawScope, 'classics'],
   ['BATTERY', drawBattery, 'wmp9'], ['ALCHEMY', drawAlchemy, 'wmp9'], ['AMBIENCE', drawAmbience, 'wmp9'], ['FIRE', drawFirestorm, 'wmp9'], ['MIST', drawMist, 'wmp9'],
@@ -5205,6 +5688,7 @@ const CLASSICS = [
   ['LAVA', drawLava, 'chill'], ['KOI', drawKoi, 'chill'], ['PEAKS', drawPeaks, 'chill'], ['STARS', drawStarry, 'chill'],
   ['8-BIT QUEST', drawQuest, 'chill'], ['POCKET VILLAGE', drawVillage, 'chill'], ['NIGHT TRAIN', drawTrain, 'chill'], ['ALMANAC FARM', drawFarm, 'chill'],
   ['LONG SAIL', drawSail, 'chill'], ['REEF TANK', drawReef, 'chill'], ['CORNER CAFE', drawCafe, 'chill'], ['THE GAME', drawBoardGame, 'chill'],
+  ['LO-FI ROOM', drawRoom, 'chill'], ['LONG TRAIL', drawTrail, 'chill'], ['TERRARIUM', drawTerrarium, 'chill'], ['OBSERVATORY', drawObservatory, 'chill'],
 ];
 
 // Each shuffle plays everything once before repeating.
@@ -5489,12 +5973,16 @@ if (startMode.has('sail')) setClassic(CLASSICS.findIndex(([, draw]) => draw === 
 if (startMode.has('reef')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawReef));
 if (startMode.has('cafe')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawCafe));
 if (startMode.has('game')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawBoardGame));
+if (startMode.has('room')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawRoom));
+if (startMode.has('trail')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawTrail));
+if (startMode.has('terrarium')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawTerrarium));
+if (startMode.has('observatory')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawObservatory));
 // Opens on the village unless the link asks for something else; ?spooky opens the graveyard.
-if (!['chill', 'quest', 'village', 'train', 'farm', 'sail', 'reef', 'cafe', 'game', 'spooky'].some(k => startMode.has(k))) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVillage));
+if (!['chill', 'quest', 'village', 'train', 'farm', 'sail', 'reef', 'cafe', 'game', 'room', 'trail', 'terrarium', 'observatory', 'spooky'].some(k => startMode.has(k))) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVillage));
 
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
-window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, tCycleMode, G, gUpdate, gMakeRule, qNewParty, F, fUpdate, S, sUpdate, R, rUpdate, R_FISH, K, kUpdate };
+window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, tCycleMode, G, gUpdate, gMakeRule, L, lUpdate, Hike, wUpdate, W_ANIMALS, E, eUpdate, O, oUpdate, O_TARGETS, qNewParty, F, fUpdate, S, sUpdate, R, rUpdate, R_FISH, K, kUpdate };
 </script>
 </body>
 </html>
