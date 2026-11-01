@@ -146,6 +146,7 @@
   <div class="row vis-row" id="xp" role="group" aria-label="Windows XP visualizers"></div>
   <div class="row"><label>SHOW</label></div>
   <div class="row vis-row" id="toggles" role="group" aria-label="Show or hide elements"></div>
+  <div class="row"><button id="trainLine" class="grow" title="Choose which railway Night Train runs on">TRAIN LINE: BOTH</button></div>
   <div class="row"><button id="newVillage" class="grow" title="Starts a new town and replaces the saved one">FOUND A NEW VILLAGE</button></div>
   <div id="stats"><span><i>666</i> kbps</span><span><i>31</i> kHz</span><span>scene <i id="sceneName">-</i></span></div>
   <div id="hint">Q menu · H bar · F full · Esc leave · N next scene · W visualizers · S spooky · X classic · 1-9, Shift+1-8 scenes</div>
@@ -517,6 +518,46 @@ const CHAT_BNF = String.raw`
 <handle> ::= <hd_a>_<hd_b> | <hd_a><hd_b>_live | xX<hd_b>Xx | the_real_<hd_b> | <hd_b>_tv
 <hd_a> ::= cryptic | sleepy | mega | tiny | turbo | feral | soggy | polite | cosmic | budget | haunted | gentle
 <hd_b> ::= pancake | gremlin | wizard | toaster | possum | noodle | goblin | biscuit | moth | potato | chromedome | badger
+<eu_town> ::= <eu_a><eu_b> | Val <eu_a><eu_b> | Sankt <eu_a><eu_b> | Bad <eu_a><eu_b> | Port <eu_a>
+<eu_a> ::= Lucer | Bellin | Grindel | Zerm | Mont | Sant | Ambr | Ostr | Wolf | Vier | Cas | Tirol
+<eu_b> ::= ano | zona | wald | mouth | burg | ova | enza | heim | ière | ona
+<jp_town> ::= <jp_a><jp_b>
+<jp_a> ::= Hana | Yama | Kawa | Mori | Shima | Matsu | Taka | Fuji | Kita | Naga | Ao | Sakura
+<jp_b> ::= moto | saki | mura | kawa | hama | dera | yama | oka | zawa | shima
+<tchat> ::= <tc_open> <tc_line> | have you seen <tc_view> | is that the {view} | next is {next}, i think | want half my {snack} | <tc_q> | <tc_ack>
+<tc_open> ::= so | honestly | anyway | you know | wait
+<tc_line> ::= i never sleep on trains | my sister lives near {next} | i may have packed too much | this is my favourite stretch | i left the stove on | i could do this forever
+<tc_view> ::= that castle | that little shrine | those hills | the sunset | that tiny dog | that cloud
+<tc_q> ::= are we nearly there | your move | is that legal | did you just cheat | whose {snack} is this | who taught you this
+<tc_ack> ::= good point | mm | ha! | oh no | clever | that hurts | hmm hmm hmm | not bad
+<tgame> ::= fancy a game of {game} | i brought {game} | best of three at {game} | you owe me a rematch | {game}, loser buys tea
+<twin> ::= got you | and that is {game} | ha! one more | you were robbed | good game | i will remember this
+<bg_name> ::= <bg_a> of the <bg_b> | <bg_a> & <bg_b>s | the <bg_c> <bg_b> | <bg_b> <bg_a>: <bg_c> edition | <bg_c> <bg_a>
+<bg_a> ::= Tribunal | Parliament | Siege | Wedding | Audit | Harvest | Prophecy | Bureau | Tax Season | Migration
+<bg_b> ::= Turnip | Soft Bishop | Moth | Damp Duke | Second Moon | Wet Accountant | Ninth Spoon | Velvet Goose | Forbidden Cheese | Tiny Pope
+<bg_c> ::= Grand | Inverted | Unlicensed | Deluxe | Haunted | Legally Distinct | Semi-Final | Ambient | Reversible | Damp
+<bg_unit> ::= points | moths | legal bishops | soft dollars | wet grams | spoons | regrets | half-dukes | turnip units | minor weather
+<bg_die> ::= 3 | 7 | fish | ? | -2 | maybe | Thursday
+<gr_rule> ::= when <gr_when>, <gr_then> | if <gr_when>, <gr_then> | whenever <gr_when>, <gr_then>
+<gr_when> ::= a piece lands on ~col~~on:land~ | a piece lands on ~col~~on:land~ | a piece lands on the ~prop~~on:landprop~ | two pieces share a tile~on:share~ | a 5 or 6 is rolled~on:rollhigh~ | a 1 or 2 is rolled~on:rolllow~ | an odd number is rolled~on:rollodd~ | a card is drawn~on:draw~ | someone laps the board~on:lap~ | a turn starts with the ~prop~~on:hold~ | the leader starts a turn~on:lead~ | last place starts a turn~on:last~ | you hold 5 cards~on:cards~
+<gr_then> ::= gain ~n~ ~unit~~do:gain~ | lose ~n~ ~unit~~do:lose~ | steal ~n~ ~unit~ from the leader~do:steal~ | move ~n~ tiles on~do:fwd~ | go back ~n~ tiles~do:back~ | miss a turn~do:skip~ | take another turn~do:extra~ | play reverses~do:reverse~ | pass the ~prop~ to last place~do:give~ | a new ~prop~ appears~do:spawn~ | all ~col~ tiles turn ~col2~~do:recolour~ | draw ~n~ cards~do:cards~ | swap places with the leader~do:swap~ | a rule is repealed~do:repeal~ | a new rule is written~do:write~ | <gr_ev>
+<gr_ev> ::= the board spins~do:ev:spin~ | the board floods~do:ev:flood~ | everyone changes seats~do:ev:seats~ | the map is redrawn~do:ev:reshape~ | the frog is released~do:ev:frog~ | the eye opens~do:ev:eye~ | the deck takes flight~do:ev:cards~ | the currency changes~do:ev:units~
+<bg_say> ::= wait, what | that's rule {rule} | rule {rule}, sorry | per rule {rule} | who wrote rule {rule} | is that legal | that's a Greg move | i have the deed to this tile | okay but the moth | {name} can't do that | i'm the pope now | objection | it's in the appendix | i think i'm winning | we never agreed on gravity | check the errata | whose hand was that | i owe the board money | that's my spoon
+<bg_ev_spin> ::= the board has entered its rotational phase, as foretold.
+<bg_ev_flood> ::= the board is now the sea. nobody seems surprised.
+<bg_ev_seats> ::= everyone must exchange lives with the player to the left.
+<bg_ev_sun> ::= a tiny sun has formed. tiles have begun to orbit.
+<bg_ev_multiply> ::= the pieces have reproduced. this is apparently fine.
+<bg_ev_tilt> ::= gravity has been put to a vote and lost.
+<bg_ev_frog> ::= the frog token has been played. the frog was not part of the box.
+<bg_ev_dice> ::= the dice have been summoned in bulk.
+<bg_ev_invert> ::= colour has briefly been repealed.
+<bg_ev_eye> ::= the board is looking at you, specifically.
+<bg_ev_hand> ::= a fifth player has joined. no one will discuss this.
+<bg_ev_cards> ::= the deck has become weather.
+<bg_ev_reshape> ::= the map has been redrawn by a committee of moths.
+<bg_ev_units> ::= scoring has moved to a new currency.
+<bg_end> ::= everyone has won, except the board | the winner is the small bishop | the game has ended, or has it | nobody won. everyone is now a duke | final score: yes
 <boat> ::= the <t_a> <bt_n> | the <bt_a> <bt_n>
 <bt_a> ::= Gentle | Salty | Plucky | Stubborn | Merry | Humble
 <bt_n> ::= Wanderer | Petrel | Dawn | Kettle | Albatross | Mermaid | Biscuit | Heron
@@ -3665,50 +3706,118 @@ function qPoly(pts, fill) {
 }
 function qOval(x, y, rx, ry, fill) { qc.fillStyle = fill; qc.beginPath(); qc.ellipse(x, y, rx, ry, 0, 0, 7); qc.fill(); }
 
-/* NIGHT TRAIN: the view from a carriage window on an endless dusk-to-dawn line. */
-const T_SAVE = 'winvamp.train', T_LEG = 170, T_STOP = 26, T_SEATS = [34, 88, 142, 196, 250], T_CRUISE = 90;
+/* NIGHT TRAIN: a carriage window on endless European and Japanese lines. */
+const T_SAVE = 'winvamp.train', T_LEG = 170, T_STOP = 26, T_SEATS = [30, 78, 140, 188, 250, 298], T_PAIRS = [[0, 1], [2, 3], [4, 5]], T_CRUISE = 90;
 const T_WIN = { x: 22, y: 20, w: 276, h: 88 };
-const T_REGIONS = {
-  MOUNTAINS: { far: [120, 130, 165], mid: [64, 96, 92], near: [34, 66, 58], ground: [40, 58, 44] },
-  FOREST: { far: [96, 132, 120], mid: [48, 92, 70], near: [28, 62, 46], ground: [34, 52, 36] },
-  SEASIDE: { far: [80, 120, 160], mid: [58, 112, 150], near: [188, 168, 120], ground: [150, 134, 96] },
-  FARMLAND: { far: [130, 150, 110], mid: [150, 150, 80], near: [96, 120, 56], ground: [84, 96, 50] },
-  CITY: { far: [90, 90, 120], mid: [62, 62, 92], near: [46, 46, 66], ground: [52, 50, 60] },
-  SNOWFIELDS: { far: [190, 204, 224], mid: [216, 226, 238], near: [236, 242, 248], ground: [224, 232, 240] },
+const T_RECIPES = {
+  euro: [
+    ['ALPINE VALLEY', 'peaks', 'forest', 'pines', ['chalet', 'church']], ['VINEYARD HILLS', 'hills', 'vines', 'hedge', ['castle', 'farm']],
+    ['RIVIERA COAST', 'sea', 'water', 'rocks', ['light', 'sail']], ['OLD TOWN', 'hills', 'town', 'fence', ['church', 'tower']],
+    ['HIGHLAND LOCH', 'peaks', 'water', 'rocks', ['castle', 'sail']], ['TULIP PLAINS', 'plain', 'tulips', 'hedge', ['mill', 'farm']],
+    ['BLACK FOREST', 'hills', 'forest', 'pines', ['chalet', 'tower']], ['GRAND BOULEVARDS', 'skyline', 'town', 'fence', ['tower', 'church']],
+  ],
+  japan: [
+    ['FUJI COUNTRY', 'fuji', 'paddy', 'bank', ['farm', 'torii']], ['TERRACED RICE', 'hills', 'paddy', 'bank', ['farm', 'shrine']],
+    ['SACRED SHORE', 'sea', 'water', 'rocks', ['torii', 'sail']], ['BAMBOO VALLEY', 'hills', 'bamboo', 'bamboo', ['shrine', 'torii']],
+    ['SAKURA RIVER', 'hills', 'blossom', 'blossom', ['pagoda', 'torii']], ['NEON SPRAWL', 'skyline', 'neon', 'fence', ['tower']],
+    ['TEA TERRACES', 'fuji', 'tea', 'bank', ['farm', 'shrine']], ['SNOW COUNTRY', 'peaks', 'forest', 'pines', ['farm', 'pagoda']],
+  ],
 };
-const T = { ready: false, S: 0, sp: 1, leg: 20, stop: 0, at: 0, line: [], region: 'FARMLAND', nextRegion: 'FOREST', tunnel: 0, swapped: true, km: 0, stops: 0, passengers: [], forcePhase: null, rain: false, news: '', newsAt: -99, nextNews: 6, banner: null, saveAt: 0, conductor: -99, t: 0 };
+const T_SEASONS = [['SPRING', [112, 164, 88]], ['SUMMER', [62, 122, 70]], ['AUTUMN', [176, 122, 58]], ['WINTER', [216, 226, 238]]];
+const T_GAMES = { euro: ['CHESS', 'CARDS', 'DRAUGHTS'], japan: ['SHOGI', 'HANAFUDA', 'GO'] };
+const J_NAMES = ['AOI', 'REN', 'HARU', 'MIO', 'SOTA', 'YUKI', 'KAI', 'HANA', 'RIKU', 'EMI', 'TARO', 'NAO', 'SORA', 'MEI'];
+const T = { ready: false, S: 0, sp: 1, leg: 20, stop: 0, at: 0, line: [], style: 'euro', mode: 'auto', view: null, next: null, tunnel: 0, swapped: true, km: 0, stops: 0, passengers: [], pairs: T_PAIRS.map(() => ({ game: null, cells: [], next: 0, say: null, moves: 0, goal: 0, score: [0, 0] })), forcePhase: null, rain: false, news: '', newsAt: -99, nextNews: 6, banner: null, saveAt: 0, conductor: -99, t: 0, nextChat: 6 };
 const tHash = (i, k = 0) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
 const tMix = (a, b, m) => a.map((v, i) => v + (b[i] - v) * m);
 const tRgb = c3 => `rgb(${c3.map(Math.round).join()})`;
 const tHex = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
 const T_NIGHT = [12, 16, 40];
 
+// Every leg gets a generated view: a landscape recipe, sometimes remixed, in a random season.
+function tScenery(style) {
+  const list = T_RECIPES[style], pick = l => l[Math.floor(rnd(0, l.length))], [base, far, mid, near, marks] = pick(list);
+  const name = base === 'SNOW COUNTRY' ? 3 : base === 'SAKURA RIVER' ? 0 : base === 'TEA TERRACES' ? 1 : Math.floor(rnd(0, 4));
+  const remix = Math.random() < .3;
+  const view = { name: base, far: remix ? pick(list)[1] : far, mid, near, marks, season: name, fog: Math.random() < .2 };
+  if (view.mid === 'water' && view.far === 'skyline') view.far = 'hills';
+  view.label = `${T_SEASONS[name][0]} ${base}`;
+  return view;
+}
+
 function tPassenger(at) {
-  const left = 1 + Math.floor(rnd(0, 4));
-  return { name: V_NAMES[Math.floor(rnd(0, V_NAMES.length))], dest: (at + left) % T.line.length, coat: ['#4a3a5a', '#5a4030', '#3a4a5a', '#6a3a3a', '#3a5a4a'][Math.floor(rnd(0, 5))], hair: V_HAIR[Math.floor(rnd(0, V_HAIR.length))], hat: Math.floor(rnd(0, 5)), asleep: Math.random() < .35, reads: Math.random() < .3, rise: 0, leaving: false, ph: rnd(0, 7) };
+  const left = 1 + Math.floor(rnd(0, 4)), names = T.style === 'japan' ? J_NAMES : V_NAMES;
+  return { name: names[Math.floor(rnd(0, names.length))], dest: (at + left) % T.line.length, coat: ['#4a3a5a', '#5a4030', '#3a4a5a', '#6a3a3a', '#3a5a4a', '#2a2a3a'][Math.floor(rnd(0, 6))], hair: V_HAIR[Math.floor(rnd(0, V_HAIR.length))], skin: ['#f4d0b0', '#ecc4a2', '#d8a878', '#b07a50', '#8a5a3a'][Math.floor(rnd(0, 5))], hat: Math.floor(rnd(0, 6)), asleep: Math.random() < .3, reads: Math.random() < .3, rise: 0, leaving: false, ph: rnd(0, 7), reach: 0 };
+}
+
+function tNewLine(style) {
+  T.style = style;
+  T.line = [...new Set(Array.from({ length: 14 }, () => chatExpand(style === 'japan' ? 'jp_town' : 'eu_town')))].slice(0, 7);
+  T.at = 0; T.next = tScenery(style); T.view = tScenery(style);
 }
 
 function tStart() {
   let saved = null;
   try { saved = JSON.parse(store.get(T_SAVE) || 'null'); } catch {}
-  T.line = saved?.line || [...new Set(Array.from({ length: 12 }, () => chatExpand('town')))].slice(0, 7);
-  T.km = saved?.km || 0; T.stops = saved?.stops || 0; T.at = (saved?.at || 0) % T.line.length;
-  T.passengers = T_SEATS.map((_, i) => { if (i === 3 || !(i % 2 === 0 || i === 1)) return null; const p = tPassenger(T.at); p.rise = 1; return p; });
+  T.km = saved?.km || 0; T.stops = saved?.stops || 0; T.mode = saved?.mode || 'auto';
+  const q0 = new URLSearchParams(location.search).get('train');
+  if (q0 === 'japan' || q0 === 'europe') T.mode = q0 === 'japan' ? 'japan' : 'euro';
+  tNewLine(T.mode === 'auto' ? (saved?.style || (Math.random() < .5 ? 'euro' : 'japan')) : T.mode);
+  T.passengers = T_SEATS.map((_, i) => { if (i === 5) return null; const p = tPassenger(T.at); p.rise = 1; return p; });
+  tSyncButton();
   T.ready = true;
 }
+function tSyncButton() { const b = document.getElementById('trainLine'); if (b) b.textContent = `TRAIN LINE: ${{ auto: 'BOTH', euro: 'EUROPE', japan: 'JAPAN' }[T.mode]}`; }
+function tCycleMode() {
+  if (!T.ready) tStart();
+  T.mode = { auto: 'euro', euro: 'japan', japan: 'auto' }[T.mode];
+  tSyncButton();
+  if (T.mode !== 'auto' && T.mode !== T.style) { tNewLine(T.mode); T.passengers = T.passengers.map(() => null); T.leg = 20; T.stop = 0; T.tunnel = 0; tRefill(); T.banner = { text: `NOW ON THE ${T.style === 'japan' ? 'JAPAN' : 'EUROPE'} LINE`, at: T.t, raw: true }; }
+  tSave();
+}
+function tRefill() { for (let i = 0; i < 5; i++) { const p = tPassenger(T.at); p.rise = 1; T.passengers[i] = p; } }
 
-function tSave() { store.set(T_SAVE, JSON.stringify({ line: T.line, km: T.km, stops: T.stops, at: T.at })); }
+function tSave() { store.set(T_SAVE, JSON.stringify({ km: T.km, stops: T.stops, style: T.style, mode: T.mode })); }
 const tNext = () => (T.at + 1) % T.line.length;
-
 function tNews(text, t) { T.news = text; T.newsAt = t; T.nextNews = t + rnd(13, 20); }
 
 function tExchange(t) {
   const off = T.passengers.filter(p => p && p.dest === T.at);
   off.forEach(p => { p.leaving = true; });
   const free = T.passengers.map((p, i) => (p ? -1 : i)).filter(i => i >= 0).sort(() => Math.random() - .5), on = Math.min(free.length, 1 + Math.floor(rnd(0, 2)));
-  for (let i = 0; i < on; i++) { const p = tPassenger(T.at); T.passengers[free[i]] = p; }
+  for (let i = 0; i < on; i++) T.passengers[free[i]] = tPassenger(T.at);
   if (off.length) tNews(`${off[0].name} steps off at ${T.line[T.at]}.`, t);
   else if (on) tNews(`${T.passengers[free[0]].name} boards at ${T.line[T.at]}.`, t);
+}
+
+function tSpeak(pair, who, text, t) { pair.say = { who, text, until: t + 4 }; }
+
+function tPairs(t) {
+  const vars = () => ({ next: T.line[tNext()], view: T.view.name.toLowerCase(), snack: T.style === 'japan' ? 'bento' : 'sandwich' });
+  T_PAIRS.forEach(([ia, ib], k) => {
+    const pair = T.pairs[k], a = T.passengers[ia], b = T.passengers[ib], ready = a && b && a.rise === 1 && b.rise === 1 && !a.leaving && !b.leaving;
+    if (!ready) { pair.game = null; pair.say = null; return; }
+    if (t < pair.next) return;
+    if (!pair.game) {
+      a.asleep = b.asleep = a.reads = b.reads = false;
+      const pool = T_GAMES[T.style];
+      pair.game = pool[Math.floor(rnd(0, pool.length))]; pair.moves = 0; pair.goal = 8 + Math.floor(rnd(0, 10)); pair.next = t + 3;
+      pair.cells = Array.from({ length: 28 }, (_, i) => (i < 7 ? 1 : i > 20 ? 2 : 0));
+      tSpeak(pair, ia, cozyLine('tgame', { game: pair.game.toLowerCase(), ...vars() }).toLowerCase(), t);
+      return;
+    }
+    pair.moves++;
+    const side = pair.moves % 2, mover = side ? a : b, piece = pair.cells.map((v, i) => (v === (side ? 1 : 2) ? i : -1)).filter(i => i >= 0), empty = pair.cells.map((v, i) => (v ? -1 : i)).filter(i => i >= 0);
+    if (piece.length && empty.length) { const from = piece[Math.floor(rnd(0, piece.length))], to = empty[Math.floor(rnd(0, empty.length))]; pair.cells[to] = pair.cells[from]; pair.cells[from] = Math.random() < .2 ? 0 : 0; }
+    mover.reach = 1;
+    pair.next = t + rnd(3, 6);
+    if (pair.moves >= pair.goal) {
+      const win = Math.random() < .5 ? 0 : 1, name = (win ? b : a).name;
+      pair.score[win]++;
+      tSpeak(pair, win ? ib : ia, cozyLine('twin', { game: pair.game.toLowerCase() }).toLowerCase(), t);
+      tNews(`${name} wins at ${pair.game.toLowerCase()}. ${pair.score[0]}-${pair.score[1]} in this carriage.`, t);
+      pair.game = null; pair.next = t + rnd(8, 16);
+    } else if (Math.random() < .5) tSpeak(pair, side ? ib : ia, cozyLine('tchat', vars()).toLowerCase(), t);
+  });
 }
 
 function tUpdate(t, dt) {
@@ -3716,24 +3825,30 @@ function tUpdate(t, dt) {
   for (let i = 0; i < T.passengers.length; i++) {
     const p = T.passengers[i];
     if (!p) continue;
+    p.reach = Math.max(0, p.reach - dt * 1.2);
     p.rise = clamp(p.rise + (p.leaving ? -dt : dt) * .7);
     if (p.leaving && !p.rise) T.passengers[i] = null;
   }
+  tPairs(t);
   if (T.stop > 0) {
     T.sp = 0; T.stop -= dt;
     if (!T.swapped && T.stop < T_STOP - 5) { T.swapped = true; tExchange(t); }
-    if (T.stop <= 0) { T.leg = 0; T.rain = Math.random() < .3; T.nextRegion = Object.keys(T_REGIONS).filter(r => r !== T.region)[Math.floor(rnd(0, 5))]; T.conductor = t + rnd(30, 90); }
+    if (T.stop <= 0) { T.leg = 0; T.rain = Math.random() < .3; T.next = tScenery(T.style); T.conductor = t + rnd(30, 90); }
     return;
   }
   T.leg += dt;
   const arriving = T_LEG - 12, tunnelAt = T_LEG * .55, near = Math.abs(T.leg - tunnelAt);
   T.sp = T.leg < 12 ? (T.leg / 12) : T.leg > arriving ? clamp(1 - (T.leg - arriving) / 12) : 1;
   T.tunnel = clamp((7 - near) / 1.2);
-  if (T.region !== T.nextRegion && T.leg >= tunnelAt) { T.region = T.nextRegion; tNews(`Now passing through the ${T.region.toLowerCase()}.`, t); }
+  if (T.next && T.leg >= tunnelAt) { T.view = T.next; T.next = null; tNews(`Now passing through: ${T.view.label.toLowerCase()}.`, t); }
   T.S += T_CRUISE * T.sp * dt; T.km += T.sp * dt * .9;
   if (T.leg >= T_LEG) {
     T.at = tNext(); T.stops++; T.stop = T_STOP; T.swapped = false; T.sp = 0;
     T.banner = { text: T.line[T.at].toUpperCase(), at: t };
+    if (T.at === 0) {
+      const style = T.mode === 'auto' ? (T.style === 'euro' ? 'japan' : 'euro') : T.mode;
+      if (style !== T.style) { const keep = T.view; tNewLine(style); T.view = keep; tNews(`End of the line. Changing to the ${style === 'japan' ? 'Japan' : 'Europe'} line.`, t); }
+    }
     tSave();
   }
   if (t > T.saveAt) { T.saveAt = t + 20; tSave(); }
@@ -3747,85 +3862,92 @@ function tLand(fn, base, col, scroll) {
   for (let sx = 0; sx < QW; sx += 2) { const y = Math.round(fn(sx + scroll)) + base; qc.fillRect(sx, y, 2, QH - y); }
 }
 
+function tMark(kind, x, y, shade, dark, t, i) {
+  const lit = dark > .3 ? '#ffd878' : shade([64, 72, 92]), wall = shade([214, 200, 176]), r = (c3, a, b, w, h) => vR(c3, x + a, y + b, w, h);
+  if (kind === 'chalet') { r(wall, 0, -10, 18, 10); r(shade([110, 70, 40]), 0, -6, 18, 1); qPoly([[x - 3, y - 10], [x + 9, y - 19], [x + 21, y - 10]], shade([120, 76, 46])); r(lit, 3, -8, 3, 3); r(lit, 12, -8, 3, 3); }
+  else if (kind === 'church') { r(wall, 0, -11, 16, 11); qPoly([[x - 2, y - 11], [x + 8, y - 18], [x + 18, y - 11]], shade([110, 70, 60])); r(wall, 12, -24, 7, 24); qPoly([[x + 11, y - 24], [x + 15.5, y - 36], [x + 20, y - 24]], shade([70, 96, 92])); r(lit, 14, -19, 3, 4); }
+  else if (kind === 'castle') { const s = shade([150, 146, 140]); r(s, 0, -16, 32, 16); r(s, -3, -26, 9, 26); r(s, 26, -30, 9, 30); for (let a = 0; a < 6; a++) r(s, a * 6, -19, 3, 3); qPoly([[x - 5, y - 26], [x + 1.5, y - 36], [x + 8, y - 26]], shade([120, 60, 60])); r(lit, 13, -11, 3, 4); }
+  else if (kind === 'mill') { r(shade([190, 176, 150]), 2, -22, 10, 22); r(shade([96, 70, 50]), 0, -26, 14, 4); qc.strokeStyle = shade([230, 226, 216]); qc.lineWidth = 2; for (let a = 0; a < 4; a++) { const ang = t * .7 + i + a * 1.57; qc.beginPath(); qc.moveTo(x + 7, y - 22); qc.lineTo(x + 7 + Math.cos(ang) * 16, y - 22 + Math.sin(ang) * 16); qc.stroke(); } }
+  else if (kind === 'farm') { r(wall, 0, -9, 15, 9); qPoly([[x - 2, y - 9], [x + 7.5, y - 16], [x + 17, y - 9]], T.style === 'japan' ? shade([60, 66, 84]) : shade([130, 60, 50])); r(lit, 3, -6, 3, 3); }
+  else if (kind === 'tower') { r(shade([160, 140, 120]), 0, -34, 9, 34); qPoly([[x - 1, y - 34], [x + 4.5, y - 44], [x + 10, y - 34]], shade([70, 96, 92])); r(shade([240, 236, 220]), 2, -29, 5, 5); }
+  else if (kind === 'light') { r(shade([236, 234, 228]), 0, -26, 6, 26); r(shade([210, 70, 60]), 0, -16, 6, 5); r(lit, 1, -29, 4, 3); if (dark > .3) { qc.fillStyle = `rgba(255,240,180,${.2 + Math.sin(t) * .15})`; qc.beginPath(); qc.moveTo(x + 3, y - 28); qc.lineTo(x + 3 + Math.cos(t * .7) * 90, y - 34 + Math.sin(t * .7) * 6); qc.lineTo(x + 3 + Math.cos(t * .7) * 90, y - 22 + Math.sin(t * .7) * 6); qc.fill(); } }
+  else if (kind === 'sail') { r(shade([240, 230, 210]), 3, -13, 1, 11); qPoly([[x + 4, y - 13], [x + 12, y - 3], [x + 4, y - 3]], shade([236, 226, 206])); r(shade([120, 70, 40]), -1, -2, 13, 2); }
+  else if (kind === 'torii') { const red = shade([214, 66, 44]); r(red, 2, -20, 3, 20); r(red, 15, -20, 3, 20); r(red, -2, -21, 24, 3); r(shade([40, 34, 34]), -3, -23, 26, 2); r(red, 1, -15, 18, 2); }
+  else if (kind === 'pagoda') { for (let a = 0; a < 4; a++) { const w = 22 - a * 4, ya = -10 - a * 10; r(shade([180, 70, 50]), 11 - w / 2 + 2, ya, w - 4, 8); qPoly([[x + 11 - w / 2 - 2, ya], [x + 11, ya - 6], [x + 11 + w / 2 + 2, ya]], shade([50, 58, 72])); } r(lit, 10, -7, 3, 4); }
+  else if (kind === 'shrine') { r(shade([190, 80, 56]), 0, -9, 18, 9); qPoly([[x - 4, y - 9], [x + 9, y - 17], [x + 22, y - 9]], shade([54, 60, 74])); r(lit, 7, -6, 4, 4); r(shade([214, 66, 44]), 26, -12, 2, 12); r(shade([214, 66, 44]), 33, -12, 2, 12); r(shade([214, 66, 44]), 24, -12, 13, 2); }
+}
+
 function tScene(t, ph, dark) {
-  const w = T_WIN, night = dark * .84, r = T_REGIONS[T.region], shade = c3 => tRgb(tMix(c3, T_NIGHT, night));
+  const w = T_WIN, night = dark * .84, v = T.view, grass = T_SEASONS[v.season][1], winter = v.season === 3, shade = c3 => tRgb(tMix(c3, T_NIGHT, night));
   const dawn = ph > .5, low = tMix(tHex(dawn ? '#f4b888' : '#e0705a'), tHex('#1c2450'), dark), high = tMix(tHex(dawn ? '#4a70b0' : '#3a3468'), tHex('#060a20'), dark);
   const sky = qc.createLinearGradient(0, w.y, 0, w.y + 72);
   sky.addColorStop(0, tRgb(high)); sky.addColorStop(1, tRgb(low));
   qc.fillStyle = sky; qc.fillRect(0, 0, QW, QH);
-  const far = T.S * .05, mid = T.S * .2, near = T.S * .6, front = T.S * 1.5;
-  if (dark > .1) for (let i = 0; i < 90; i++) {
-    qc.globalAlpha = dark * (.4 + .6 * Math.abs(Math.sin(t * .6 + i)));
-    vR('#fff', (i * 37.3 + 300 - far * .3 % 300) % QW, w.y + (i * 23.7) % 62, 1, 1);
-  }
+  const far = T.S * .05, mid = T.S * .2, near = T.S * .6, front = T.S * 1.5, ground = 96;
+  if (dark > .1) for (let i = 0; i < 90; i++) { qc.globalAlpha = dark * (.4 + .6 * Math.abs(Math.sin(t * .6 + i))); vR('#fff', (i * 37.3 + 300 - far * .3 % 300) % QW, w.y + (i * 23.7) % 62, 1, 1); }
   qc.globalAlpha = 1;
   const mx = 214 - ph * 90, my = 40 + Math.abs(ph - .5) * 44;
   qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = .5; qc.drawImage(qGlow, mx - 34, my - 34, 68, 68); qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over';
   qc.fillStyle = dark > .5 ? '#f0ecd8' : '#ffd8a0'; qc.beginPath(); qc.arc(mx, my, 10, 0, 7); qc.fill();
   if (dark > .5) { qc.fillStyle = '#d8d4c0'; qc.beginPath(); qc.arc(mx - 3, my - 2, 2.5, 0, 7); qc.arc(mx + 4, my + 3, 3, 0, 7); qc.fill(); }
-  const shoot = t % 37;
-  if (dark > .6 && shoot < .8) { vR('#fff', 60 + shoot * 90, 28 + shoot * 12, 7, 1); }
-  if (T.region === 'SNOWFIELDS' && dark > .3) {
+  if (dark > .6 && t % 37 < .8) vR('#fff', 60 + (t % 37) * 90, 28 + (t % 37) * 12, 7, 1);
+  if (winter && dark > .3) {
     qc.globalCompositeOperation = 'lighter';
-    [['60,255,170', 0], ['120,120,255', 2]].forEach(([rgb, off]) => {
-      for (let x = w.x; x < w.x + w.w; x += 3) {
-        qc.fillStyle = `rgba(${rgb},${dark * .16 * (.6 + Math.sin(x * .05 + t * .5 + off) * .4)})`;
-        qc.fillRect(x, 30 + Math.sin(x * .03 + t * .2 + off) * 8, 3, 34);
-      }
-    });
+    [['60,255,170', 0], ['120,120,255', 2]].forEach(([rgb, off]) => { for (let x = w.x; x < w.x + w.w; x += 3) { qc.fillStyle = `rgba(${rgb},${dark * .16 * (.6 + Math.sin(x * .05 + t * .5 + off) * .4)})`; qc.fillRect(x, 30 + Math.sin(x * .03 + t * .2 + off) * 8, 3, 34); } });
     qc.globalCompositeOperation = 'source-over';
   }
-  const lights = (spacing, scroll, y, chance, col) => {
-    for (let i = Math.floor(scroll / spacing); i * spacing - scroll < QW; i++) if (tHash(i, 3) < chance) {
-      const x = i * spacing - scroll + tHash(i, 5) * spacing * .6;
-      vR(tHash(i, 9) < dark ? col : shade([70, 70, 80]), x, y + tHash(i, 7) * 5, 2, 2);
-    }
-  };
-  if (T.region === 'MOUNTAINS') {
+  const hazy = tMix(grass, [130, 150, 190], .6);
+  if (v.far === 'peaks') {
     const peak = x => -32 - Math.abs(Math.sin(x * .017)) * 30 - Math.abs(Math.sin(x * .041 + 1)) * 14;
-    tLand(peak, 92, shade(r.far), far);
+    tLand(peak, 92, shade([118, 128, 164]), far);
     for (let sx = 0; sx < QW; sx += 2) { const y = Math.round(peak(sx + far)) + 92; if (y < 58) vR(shade([232, 236, 244]), sx, y, 2, Math.min(5, 60 - y)); }
-    tLand(x => -14 - Math.sin(x * .02) * 10 - Math.sin(x * .05) * 4, 96, shade(r.mid), mid);
-  } else if (T.region === 'FOREST') {
-    tLand(x => -22 - Math.sin(x * .012) * 10, 92, shade(r.far), far);
-    tLand(x => -16 - Math.sin(x * .03) * 5 - Math.abs(Math.sin(x * .3)) * 5, 96, shade(r.mid), mid);
-  } else if (T.region === 'SEASIDE') {
-    tLand(x => -6 - Math.sin(x * .02) * 2, 72, shade(r.far), far * 2);
-    const sea = shade(r.mid);
-    qc.fillStyle = sea; qc.fillRect(0, 74, QW, 40);
-    for (let i = 0; i < 40; i++) vR(dark > .4 ? '#b8c8e0' : '#ffd0a8', mx - 18 + (i * 7.3) % 36 + Math.sin(t + i) * 3, 76 + (i * 3.1) % 26, 4, 1);
-    const lx = ((-mid * .6) % 700) + 620;
-    vR(shade([230, 230, 230]), lx, 56, 4, 18); vR('#d84a4a', lx, 62, 4, 3);
-    if (dark > .3) { qc.fillStyle = `rgba(255,240,180,${.2 + Math.sin(t) * .15})`; qc.beginPath(); qc.moveTo(lx + 2, 56); qc.lineTo(lx + 2 + Math.cos(t * .7) * 90, 50 + Math.sin(t * .7) * 6); qc.lineTo(lx + 2 + Math.cos(t * .7) * 90, 60 + Math.sin(t * .7) * 6); qc.fill(); }
-    const bx = ((-mid * .4) % 500) + 460; vR(shade([240, 230, 210]), bx + 3, 64, 1, 9); qPoly([[bx + 4, 64], [bx + 11, 72], [bx + 4, 72]], shade([236, 226, 206])); vR(shade([120, 70, 40]), bx, 73, 12, 2);
-  } else if (T.region === 'FARMLAND') {
-    tLand(x => -14 - Math.sin(x * .014) * 8, 90, shade(r.far), far);
-    tLand(x => -10 - Math.sin(x * .03) * 5, 96, shade(r.mid), mid);
-    for (let i = Math.floor(mid / 110); i * 110 - mid < QW; i++) if (tHash(i, 1) < .6) {
-      const x = i * 110 - mid + tHash(i, 2) * 60;
-      vR(shade([190, 150, 110]), x, 76, 13, 9); qPoly([[x - 2, 76], [x + 6, 69], [x + 15, 76]], shade([130, 60, 50]));
-      vR(dark > .3 ? '#ffd878' : shade([60, 70, 90]), x + 3, 79, 3, 3);
+  } else if (v.far === 'fuji') {
+    const x = 170 - (far % 1200) * .5 + (far % 1200 > 800 ? 600 : 0);
+    qPoly([[x - 130, 96], [x - 18, 28], [x + 18, 28], [x + 130, 96]], shade([92, 112, 158]));
+    qPoly([[x - 18, 28], [x + 18, 28], [x + 44, 44], [x + 26, 40], [x + 10, 48], [x - 6, 40], [x - 24, 47], [x - 44, 44]], shade([240, 244, 250]));
+    tLand(p => -12 - Math.sin(p * .012) * 5, 94, shade(hazy), far * 1.5);
+  } else if (v.far === 'skyline') {
+    for (const [speed, spacing, c3, top] of [[far * 2, 22, [92, 92, 122], 46], [mid * .7, 30, [64, 64, 94], 58]]) for (let i = Math.floor(speed / spacing); i * spacing - speed < QW; i++) {
+      const x = i * spacing - speed, y = top + tHash(i, top) * 22;
+      vR(shade(c3), x, y, spacing - 2, 100);
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 6; b++) if (tHash(i * 7 + a, b) < .4 + dark * .25) vR(dark > .25 ? ['#ffd878', '#f0a860', '#90c8f0'][(a + b) % 3] : shade([40, 44, 70]), x + 2 + a * 5, y + 3 + b * 6, 2, 3);
     }
-  } else if (T.region === 'CITY') {
-    for (const [speed, spacing, c3, top] of [[far * 2, 22, r.far, 46], [mid, 30, r.mid, 58]]) {
-      for (let i = Math.floor(speed / spacing); i * spacing - speed < QW; i++) {
-        const x = i * spacing - speed, y = top + tHash(i, top) * 22;
-        vR(shade(c3), x, y, spacing - 2, 100);
-        for (let a = 0; a < 4; a++) for (let b = 0; b < 6; b++) if (tHash(i * 7 + a, b) < .4 + dark * .25) vR(dark > .25 ? ['#ffd878', '#f0a860', '#90c8f0'][(a + b) % 3] : shade([40, 44, 70]), x + 2 + a * 5, y + 3 + b * 6, 2, 3);
-      }
-    }
+  } else if (v.far === 'sea') { qc.fillStyle = shade([70, 120, 170]); qc.fillRect(0, 72, QW, 40); for (let i = 0; i < 36; i++) vR(dark > .4 ? '#b8c8e0' : '#ffd0a8', mx - 18 + (i * 7.3) % 36 + Math.sin(t + i) * 3, 74 + (i * 3.1) % 24, 4, 1); }
+  else if (v.far === 'hills') tLand(x => -22 - Math.sin(x * .012) * 10 - Math.sin(x * .03) * 4, 92, shade(hazy), far);
+  else tLand(x => -6 - Math.sin(x * .01) * 3, 92, shade(hazy), far);
+  const midCol = shade(v.far === 'sea' && v.mid === 'water' ? [58, 110, 150] : grass);
+  if (v.mid === 'water') { qc.fillStyle = shade([60, 112, 156]); qc.fillRect(0, 80, QW, 30); for (let i = 0; i < 40; i++) vR(shade([190, 214, 236]), (i * 31 - mid + 9000) % QW, 82 + (i * 7) % 18, 5, 1); }
+  else if (v.mid === 'town') {
+    tLand(x => -8, 96, midCol, mid);
+    for (let i = Math.floor(mid / 16); i * 16 - mid < QW; i++) { const x = i * 16 - mid, h = 10 + tHash(i, 2) * 16, col = shade([[200, 176, 150], [178, 150, 130], [210, 196, 170], [170, 130, 110]][i & 3]); vR(col, x, 90 - h, 15, h + 8); qPoly([[x - 1, 90 - h], [x + 7.5, 83 - h], [x + 16, 90 - h]], shade(i % 3 ? [130, 66, 54] : [86, 90, 104])); for (let b = 0; b < 2; b++) vR(tHash(i, b) < dark ? '#ffd878' : shade([60, 66, 84]), x + 3 + b * 6, 92 - h, 3, 4); }
+  } else if (v.mid === 'neon') {
+    tLand(() => -6, 96, shade([50, 50, 66]), mid);
+    for (let i = Math.floor(mid / 34); i * 34 - mid < QW; i++) { const x = i * 34 - mid, top = 54 + tHash(i, 3) * 20, cols = ['#ff4a8a', '#4ac8ff', '#ffd24a', '#7dff5a']; vR(shade([44, 44, 62]), x, top, 28, 60); for (let a = 0; a < 5; a++) vR(Math.sin(t * 3 + i + a) > -.6 ? cols[(i + a) % 4] : '#303048', x + 3, top + 3 + a * 6, 6, 4); vR(cols[(i + 2) % 4], x + 13, top + 4, 11, 2); vR(cols[(i + 1) % 4], x + 13, top + 9, 8, 2); }
   } else {
-    tLand(x => -20 - Math.sin(x * .01) * 12, 90, shade(r.far), far);
-    tLand(x => -12 - Math.sin(x * .025) * 6, 96, shade(r.mid), mid);
-    for (let i = Math.floor(mid / 34); i * 34 - mid < QW; i++) if (tHash(i, 4) < .5) { const x = i * 34 - mid; qPoly([[x, 88], [x + 5, 72], [x + 10, 88]], shade([44, 74, 76])); }
+    tLand(x => -14 - Math.sin(x * .03) * 5, 96, midCol, mid);
+    const rows = (gap, col, tall) => { for (let y = 84; y < 104; y += gap) for (let i = 0; i < 44; i++) vR(col, (i * 8 - mid * (.6 + (y - 84) * .03) + 9000) % QW, y, 4, tall); };
+    if (v.mid === 'vines') rows(4, shade([60, 90, 56]), 2);
+    if (v.mid === 'tea') rows(5, shade([58, 136, 86]), 3);
+    if (v.mid === 'tulips') { [[230, 70, 80], [240, 196, 60], [216, 110, 190], [240, 240, 230]].forEach((c3, b) => { const y = 84 + b * 5; for (let i = 0; i < 80; i++) vR(shade(c3), (i * 4 - mid * (.7 + b * .1) + 9000) % QW, y, 3, 4); }); }
+    if (v.mid === 'paddy') { for (let b = 0; b < 4; b++) { const y = 84 + b * 6; vR(shade(tMix([120, 160, 190], [110, 176, 90], winter ? 0 : .35)), 0, y, QW, 5); vR(shade([90, 70, 48]), 0, y + 5, QW, 1); } for (let i = 0; i < 80; i++) vR(shade([76, 150, 76]), (i * 9 - mid * .9 + 9000) % QW, 85 + (i % 4) * 6, 1, 3); }
+    if (v.mid === 'forest') for (let i = Math.floor(mid / 9); i * 9 - mid < QW; i++) { const x = i * 9 - mid, h = 14 + tHash(i, 1) * 14, c3 = winter ? [52, 84, 84] : tMix(grass, [20, 60, 40], .55); qPoly([[x - 6, 94], [x, 94 - h], [x + 6, 94]], shade(c3)); }
+    if (v.mid === 'bamboo' || v.near === 'bamboo') for (let i = Math.floor(mid / 7); i * 7 - mid < QW; i++) { const x = i * 7 - mid + Math.sin(t * .6 + i) * 1; vR(shade([78, 140, 80]), x, 40 + tHash(i, 2) * 26, 2, 60); }
+    if (v.mid === 'blossom') for (let i = Math.floor(mid / 18); i * 18 - mid < QW; i++) { const x = i * 18 - mid; vR(shade([70, 50, 40]), x + 1, 80, 2, 14); qOval(x + 2, 76, 11, 9, shade([244, 180, 200])); qOval(x + 6, 72, 7, 6, shade([250, 206, 220])); }
+    if (v.season === 2 && v.mid === 'forest') for (let i = 0; i < 40; i++) vR(shade([[200, 90, 40], [220, 170, 50]][i & 1]), (i * 13 - mid + 9000) % QW, 74 + (i * 7) % 18, 3, 3);
   }
-  if (T.region !== 'CITY' && T.region !== 'SEASIDE') lights(70, mid, 80, .35, '#ffd080');
-  tLand(x => -4 - Math.sin(x * .03) * 2, 104, shade(r.near), near);
-  if (T.region === 'FOREST' || T.region === 'MOUNTAINS' || T.region === 'SNOWFIELDS') for (let i = Math.floor(near / 26); i * 26 - near < QW; i++) if (tHash(i, 6) < .6) {
-    const x = i * 26 - near, h = 18 + tHash(i, 8) * 16; qPoly([[x, 104], [x + 6, 104 - h], [x + 12, 104]], shade(T.region === 'SNOWFIELDS' ? [50, 84, 84] : [22, 52, 40]));
+  for (let i = Math.floor(mid / 130); i * 130 - mid < QW + 40; i++) if (tHash(i, 12) < .75 && v.marks.length) tMark(v.marks[Math.floor(tHash(i, 13) * v.marks.length)], i * 130 - mid + tHash(i, 14) * 70, 94, shade, dark, t, i);
+  const nearCol = shade(winter ? [234, 240, 246] : tMix(grass, [20, 40, 30], .4));
+  tLand(x => -4 - Math.sin(x * .03) * 2, 104, nearCol, near);
+  for (let i = Math.floor(near / 26); i * 26 - near < QW; i++) {
+    const x = i * 26 - near, roll = tHash(i, 6);
+    if (v.near === 'pines' && roll < .6) { const h = 18 + tHash(i, 8) * 16; qPoly([[x, 104], [x + 6, 104 - h], [x + 12, 104]], shade(winter ? [50, 84, 84] : [22, 52, 40])); }
+    if (v.near === 'hedge') vR(shade(tMix(grass, [20, 50, 30], .6)), x, 98, 22, 8);
+    if (v.near === 'fence') { vR(shade([84, 78, 74]), x, 92, 2, 14); vR(shade([84, 78, 74]), x, 95, 26, 1); }
+    if (v.near === 'rocks' && roll < .5) qOval(x + 6, 104, 9, 6, shade([96, 92, 96]));
+    if (v.near === 'blossom' && roll < .5) { vR(shade([70, 50, 40]), x + 4, 92, 3, 14); qOval(x + 5, 86, 16, 12, shade([248, 190, 210])); }
+    if (v.near === 'bank' && roll < .25) vR(shade([214, 66, 44]), x, 94, 2, 10);
   }
-  if (T.region === 'FARMLAND') for (let i = Math.floor(near / 44); i * 44 - near < QW; i++) if (tHash(i, 2) < .4) { const x = i * 44 - near; vR(shade([200, 170, 80]), x, 96, 8, 7); vR(shade([170, 140, 60]), x + 1, 98, 6, 1); }
-  const bridge = tHash(T.line.length + T.stops, 11) < .6 && T.leg > T_LEG * .2 && T.leg < T_LEG * .32;
+  const bridge = tHash(T.stops + 3, 11) < .6 && T.leg > T_LEG * .2 && T.leg < T_LEG * .32;
   if (bridge && T.sp === 1) {
     qc.strokeStyle = shade([96, 70, 60]); qc.lineWidth = 2;
     for (let i = Math.floor(front / 60); i * 60 - front < QW; i++) { const x = i * 60 - front; qc.beginPath(); qc.moveTo(x, 30); qc.lineTo(x + 60, 104); qc.moveTo(x + 60, 30); qc.lineTo(x, 104); qc.stroke(); }
@@ -3836,107 +3958,144 @@ function tScene(t, ph, dark) {
     const off = -(front % 210);
     for (let i = -1; i < 3; i++) { const a = off + i * 210; qc.beginPath(); qc.moveTo(a, 37); qc.quadraticCurveTo(a + 105, 50, a + 210, 37); qc.stroke(); }
   }
-  vR(shade(r.ground), 0, 104, QW, 8);
-  // The platform slides in and out using the distance left to the stop.
+  vR(shade(tMix(grass, [60, 50, 44], .6)), 0, 104, QW, 8);
+  if (v.fog) { qc.fillStyle = `rgba(230,234,240,${.22 * (1 - dark * .6)})`; qc.fillRect(0, 60, QW, 50); }
   const tail = T.leg > T_LEG - 12 ? 1 - (T.leg - (T_LEG - 12)) / 12 : T.stop > 0 ? 0 : T.leg < 12 ? -(T.leg / 12) : null;
+  T.signX = null;
   if (tail !== null) {
-    const px = 160 + Math.sign(tail) * T_CRUISE * 12 * tail * tail / 2 + (tail < 0 ? 0 : 0), half = 210;
+    const px = 160 + Math.sign(tail) * T_CRUISE * 12 * tail * tail / 2, half = 210, jp = T.style === 'japan';
     if (px - half < QW && px + half > 0) {
-      vR(shade([120, 116, 112]), px - half, 92, half * 2, 20); vR(shade([200, 180, 90]), px - half, 92, half * 2, 1);
-      vR(shade([70, 50, 60]), px - half, 30, half * 2, 8);
+      vR(shade(jp ? [168, 168, 170] : [120, 116, 112]), px - half, 92, half * 2, 20); vR(shade(jp ? [236, 200, 60] : [200, 180, 90]), px - half, jp ? 96 : 92, half * 2, jp ? 3 : 1);
+      vR(shade(jp ? [226, 228, 232] : [70, 50, 60]), px - half, 30, half * 2, 8);
       for (let i = -3; i <= 3; i++) {
         const lx = px + i * 66;
-        vR(shade([40, 34, 34]), lx, 38, 2, 54);
-        vR(dark > .2 ? '#ffe090' : '#a8a890', lx - 2, 44, 6, 3);
-        if (dark > .2) { qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = dark * .5; qc.drawImage(qTint('#ffc060'), lx - 28, 22, 58, 58); qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over'; }
+        vR(shade(jp ? [150, 156, 166] : [40, 34, 34]), lx, 38, 2, 54);
+        if (!jp) vR(dark > .2 ? '#ffe090' : '#a8a890', lx - 2, 44, 6, 3); else vR(dark > .2 ? '#f4f8ff' : '#c8d0d8', lx - 12, 38, 26, 2);
+        if (dark > .2) { qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = dark * .5; qc.drawImage(qTint(jp ? '#c8dcff' : '#ffc060'), lx - 28, 22, 58, 58); qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over'; }
         const fig = i * 3 + 9 + T.stops;
+        if (jp && i === 2) { vR('#d83a3a', lx + 14, 66, 14, 26); vR('#f0f0f0', lx + 16, 69, 10, 8); vR('#303038', lx + 16, 82, 10, 3); }
         if (tHash(fig, 1) < .55) { const fx = lx + 22, col = shade(tHex(V_CLOTHES[fig % V_CLOTHES.length])); vR(col, fx, 78, 7, 14); vR(shade([236, 196, 162]), fx + 1, 72, 5, 6); vR(shade([50, 40, 40]), fx + 1, 71, 5, 2); }
       }
-      vR(shade([60, 44, 34]), px - 34, 50, 68, 14);
+      vR(shade(jp ? [34, 74, 150] : [60, 44, 34]), px - 34, 50, 68, 14);
       T.signX = px;
-    } else T.signX = null;
-  } else T.signX = null;
+    }
+  }
   if (T.tunnel) {
     qc.fillStyle = `rgba(4,4,8,${T.tunnel})`; qc.fillRect(0, 0, QW, QH);
     if (T.tunnel > .6) for (let i = 0; i < 4; i++) { const x = QW - ((t * 340 + i * 80) % (QW + 40)); vR('#ffd880', x, 32, 12, 2); vR('rgba(255,216,128,.2)', x - 8, 30, 28, 6); }
   }
-  if (T.rain || T.region === 'SNOWFIELDS') for (let i = 0; i < 70; i++) {
-    const snow = T.region === 'SNOWFIELDS', y = w.y + (t * (snow ? 16 : 34) + i * 13.7) % w.h, x = (i * 41.3 - t * (snow ? 60 : 110) * T.sp + 9000) % QW;
-    vR(snow ? 'rgba(255,255,255,.75)' : 'rgba(190,210,240,.55)', x, y, snow ? 1 : 5 * (.3 + T.sp), 1);
+  if (SHOW.effects) {
+    if (T.rain || winter) for (let i = 0; i < 70; i++) { const y = w.y + (t * (winter ? 16 : 34) + i * 13.7) % w.h, x = (i * 41.3 - t * (winter ? 60 : 110) * T.sp + 9000) % QW; vR(winter ? 'rgba(255,255,255,.75)' : 'rgba(190,210,240,.55)', x, y, winter ? 1 : 5 * (.3 + T.sp), 1); }
+    if (v.mid === 'blossom' || v.near === 'blossom') for (let i = 0; i < 26; i++) vR('#fbd0e0', (i * 43.1 - t * 70 * T.sp + 9000) % QW, w.y + (t * 12 + i * 11.3) % w.h, 2, 1);
+    if (v.season === 2) for (let i = 0; i < 12; i++) vR(['#d87a2a', '#e0b040'][i & 1], (i * 47.1 - t * 80 * T.sp + 9000) % QW, w.y + (t * 16 + i * 17.3) % w.h, 2, 1);
   }
 }
 
 function tInterior() {
-  if (T.wall) return T.wall;
-  const s = T.wall = document.createElement('canvas');
+  const jp = T.style === 'japan';
+  T.walls ||= {};
+  if (T.walls[T.style]) return T.walls[T.style];
+  const s = T.walls[T.style] = document.createElement('canvas');
   s.width = QW; s.height = QH;
   const g = s.getContext('2d'), w = T_WIN, box = (col, x, y, a, b) => { g.fillStyle = col; g.fillRect(x, y, a, b); };
-  box('#3e2616', 0, 0, QW, QH);
-  for (let x = 0; x < QW; x += 14) { box('#33200f', x, 0, 1, QH); box('#4a2e1c', x + 1, 0, 1, QH); }
-  box('#1c120a', 0, 0, QW, 17); box('#b8924a', 0, 17, QW, 1);
-  box('#2a1a10', 0, 118, QW, 62); box('#b8924a', 0, 118, QW, 1);
+  box(jp ? '#d8d6cc' : '#3e2616', 0, 0, QW, QH);
+  if (!jp) for (let x = 0; x < QW; x += 14) { box('#33200f', x, 0, 1, QH); box('#4a2e1c', x + 1, 0, 1, QH); }
+  box(jp ? '#1c2a4a' : '#1c120a', 0, 0, QW, 17); box(jp ? '#8a98b8' : '#b8924a', 0, 17, QW, 1);
+  box(jp ? '#b8b6ac' : '#2a1a10', 0, 118, QW, 62); box(jp ? '#8a98b8' : '#b8924a', 0, 118, QW, 1);
   g.globalCompositeOperation = 'destination-out';
-  g.beginPath(); g.roundRect(w.x, w.y, w.w, w.h, 7); g.fill();
+  g.beginPath(); g.roundRect(w.x, w.y, w.w, w.h, jp ? 4 : 7); g.fill();
   g.globalCompositeOperation = 'source-over';
-  g.strokeStyle = '#1c120a'; g.lineWidth = 4; g.beginPath(); g.roundRect(w.x - 1, w.y - 1, w.w + 2, w.h + 2, 8); g.stroke();
-  g.strokeStyle = '#b8924a'; g.lineWidth = 1; g.beginPath(); g.roundRect(w.x - 3, w.y - 3, w.w + 6, w.h + 6, 9); g.stroke();
-  box('#1c120a', 157, w.y, 6, w.h); box('#b8924a', 159, w.y, 1, w.h);
-  box('#6a4426', 14, 108, 292, 7); box('#8a5a34', 14, 108, 292, 2); box('#2a1a10', 14, 115, 292, 2);
+  g.strokeStyle = jp ? '#8a8e98' : '#1c120a'; g.lineWidth = 4; g.beginPath(); g.roundRect(w.x - 1, w.y - 1, w.w + 2, w.h + 2, jp ? 5 : 8); g.stroke();
+  if (!jp) { g.strokeStyle = '#b8924a'; g.lineWidth = 1; g.beginPath(); g.roundRect(w.x - 3, w.y - 3, w.w + 6, w.h + 6, 9); g.stroke(); }
+  box(jp ? '#8a8e98' : '#1c120a', 157, w.y, 6, w.h); if (!jp) box('#b8924a', 159, w.y, 1, w.h);
+  box(jp ? '#c8c6bc' : '#6a4426', 14, 108, 292, 7); box(jp ? '#e4e2d8' : '#8a5a34', 14, 108, 292, 2); box(jp ? '#9a988e' : '#2a1a10', 14, 115, 292, 2);
   return s;
 }
 
-function tCurtain(x, dir, t, rock) {
-  for (let i = 0; i < 22; i++) {
+function tBlinds(t, rock) {
+  const w = T_WIN;
+  if (T.style === 'japan') {
+    vR('#e8e6dc', w.x, w.y, w.w, 9);
+    for (let i = 0; i < 3; i++) vR('#c8c6bc', w.x, w.y + i * 3, w.w, 1);
+    for (const x of [40, 104, 216, 280]) { const sway = Math.round(Math.sin(t * 2 + x) * rock * 2); vR('#f4f4f0', x + sway, 20, 1, 12); qc.strokeStyle = '#f4f4f0'; qc.lineWidth = 1; qc.beginPath(); qc.arc(x + sway, 35, 3, 0, 7); qc.stroke(); }
+    return;
+  }
+  for (const [x, dir] of [[w.x, 1], [w.x + w.w, -1]]) for (let i = 0; i < 22; i++) {
     const wave = Math.sin(i * .4 + t * 1.3) * (1 + rock * 2), wide = 16 - Math.abs(i - 2) * .1 + wave;
     vR(i % 4 ? '#7a2a34' : '#5e1e28', dir > 0 ? x : x - wide, 20 + i * 4, wide, 4);
   }
 }
 
-function tPerson(p, x, t, rock, dark) {
-  const sink = (1 - p.rise) * 54, y = 130 + sink + Math.round(rock * Math.sin(t * 7 + p.ph)), tilt = p.asleep ? 3 : 0;
+function tPerson(p, x, t, rock, dark, face) {
+  const sink = (1 - p.rise) * 54, y = 130 + sink + Math.round(rock * Math.sin(t * 7 + p.ph)), tilt = p.asleep ? 3 : 0, nod = face ? Math.round(Math.sin(t * .7 + p.ph)) : 0;
   vR(p.coat, x - 15, y + 13, 30, 40); vR(p.coat, x - 12, y + 10, 24, 4);
-  qc.fillStyle = p.hair; qc.beginPath(); qc.arc(x + tilt, y + (p.asleep ? 3 : 0), 10, 0, 7); qc.fill();
+  if (face && p.reach) { vR(p.coat, x + face * 8, y + 16, face * 14 > 0 ? 14 : 14, 4); vR(p.skin, x + face * 14 + (face > 0 ? 8 : -2), y + 16, 4, 4); }
+  qc.fillStyle = p.hair; qc.beginPath(); qc.arc(x + tilt, y + nod + (p.asleep ? 3 : 0), 10, 0, 7); qc.fill();
+  if (face) { vR(p.skin, x + (face > 0 ? 4 : -9), y - 4 + nod, 5, 9); vR('#201820', x + (face > 0 ? 7 : -8), y - 2 + nod, 1, 2); vR(p.skin, x + (face > 0 ? 9 : -10), y + nod, 1, 2); }
   if (p.hat === 1) { vR('#2a2a34', x - 13 + tilt, y - 6, 26, 3); vR('#2a2a34', x - 8 + tilt, y - 14, 16, 9); }
   if (p.hat === 2) { vR('#b84a3a', x - 10 + tilt, y - 11, 20, 8); vR('#f0ece0', x - 2 + tilt, y - 14, 4, 4); }
   if (p.hat === 3) { vR('#c8a060', x - 15 + tilt, y - 5, 30, 2); vR('#c8a060', x - 9 + tilt, y - 11, 18, 7); }
-  if (p.reads && !p.asleep) {
+  if (p.reads && !p.asleep && !face) {
     vR('#f4efe0', x + 13, y + 12, 8, 6); vR('#c8c0a8', x + 17, y + 12, 1, 6);
     if (dark > .2 && SHOW.lights) { qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = .35 * dark; qc.drawImage(qTint('#ffd080'), x - 10, y - 12, 56, 56); qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over'; }
+  }
+}
+
+function tTable(k, t) {
+  const pair = T.pairs[k], x = (T_SEATS[T_PAIRS[k][0]] + T_SEATS[T_PAIRS[k][1]]) / 2, jp = T.style === 'japan';
+  vR(jp ? '#9a988e' : '#3a2416', x - 1, 150, 2, 12);
+  vR(jp ? '#c8c6bc' : '#6a4426', x - 15, 143, 30, 7); vR(jp ? '#e4e2d8' : '#8a5a34', x - 15, 143, 30, 1);
+  if (!pair.game) { vR(jp ? '#3e8a4a' : '#e8e0d0', x - 2, 139, 4, 4); return; }
+  if (pair.game === 'CARDS' || pair.game === 'HANAFUDA') {
+    const col = pair.game === 'CARDS' ? '#f4f0e6' : '#c83a3a';
+    for (let i = 0; i < 3; i++) { vR(col, x - 13 + i * 2, 141 - (i & 1), 3, 5); vR(col, x + 6 + i * 2, 141 - (i & 1), 3, 5); }
+    for (let i = 0; i < Math.min(5, pair.moves); i++) vR(i % 2 ? '#e8d8a0' : col, x - 5 + i * 2, 144 + (i & 1), 3, 4);
+    vR('#2a4a8a', x - 2, 141, 4, 3);
+    return;
+  }
+  const board = pair.game === 'GO' ? '#d8b070' : pair.game === 'SHOGI' ? '#e0c080' : '#f0e8d0', dark2 = pair.game === 'GO' || pair.game === 'SHOGI' ? '#b08a50' : '#5a3a28';
+  vR(board, x - 14, 138, 28, 8);
+  for (let c2 = 0; c2 < 7; c2++) for (let r = 0; r < 4; r++) {
+    if ((c2 + r) % 2 && pair.game !== 'GO') vR(dark2, x - 14 + c2 * 4, 138 + r * 2, 4, 2);
+    const v = pair.cells[c2 + r * 7];
+    if (v) vR(v === 1 ? '#f4f4ec' : '#201820', x - 13 + c2 * 4, 137 + r * 2, 2, 2);
   }
 }
 
 function drawTrain(t, dt) {
   if (!T.ready) tStart();
   tUpdate(t, dt);
-  const ph = tPhase(t), dark = tDark(ph), rock = T.sp, w = T_WIN;
+  const ph = tPhase(t), dark = tDark(ph), rock = T.sp, w = T_WIN, jp = T.style === 'japan';
   tScene(t, ph, dark);
-  const glass = dark * .1;
-  if (glass && SHOW.lights) { qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = glass * 2.4; qc.drawImage(qTint('#ffc060'), 110, 40, 100, 80); qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over'; }
   if (SHOW.effects && T.rain) for (let i = 0; i < 26; i++) {
     const x = w.x + 4 + (i * 53.7 - t * (8 + i % 5) * T.sp * 4 + 9000) % (w.w - 8), y = w.y + 4 + (i * 17.3 + t * (3 + i % 4)) % (w.h - 8);
     vR('rgba(220,235,255,.5)', x, y, 3, 1); vR('rgba(220,235,255,.8)', x, y, 1, 1);
   }
-  tCurtain(w.x, 1, t, rock); tCurtain(w.x + w.w, -1, t, rock);
+  tBlinds(t, rock);
   qc.drawImage(tInterior(), 0, 0);
-  const lamp = .55 + A.bass * .25 + Math.sin(t * 13) * .02;
-  if (SHOW.lights) {
-    qc.fillStyle = `rgba(8,6,16,${.42 * dark})`;
-    qc.beginPath(); qc.rect(0, 0, QW, QH); qc.roundRect(w.x, w.y, w.w, w.h, 7); qc.fill('evenodd');
+  if (SHOW.lights) { qc.fillStyle = `rgba(8,6,16,${(jp ? .18 : .42) * dark})`; qc.beginPath(); qc.rect(0, 0, QW, QH); qc.roundRect(w.x, w.y, w.w, w.h, 7); qc.fill('evenodd'); }
+  if (jp) {
+    vR('#a8d0e8', 110, 100, 18, 8); vR('#c84a3a', 112, 101, 14, 3); vR('#f4f0e0', 112, 104, 14, 3);
+    vR('#3e9a5a', 134, 96, 6, 12); vR('#f4f4f0', 135, 94, 4, 2);
+  } else {
+    vR('#b8924a', 158, 100, 4, 8); vR('#e8b858', 152, 90, 16, 10); vR('#fff0b0', 155, 95, 10, 4);
+    vR('#e8e0d0', 112, 102, 8, 6); vR('#c8b8a0', 120, 103, 2, 3); vR('#7a4a2a', 113, 103, 6, 1);
+    if (SHOW.effects) vSmoke(114, 100, t, 1);
   }
-  vR('#b8924a', 158, 100, 4, 8); vR('#e8b858', 152, 90, 16, 10); vR('#fff0b0', 155, 95, 10, 4);
   if (SHOW.pets) {
     const x = 78, tail = Math.sin(t * .9) * 3, col = '#201820';
     vR(col, x, 100, 14, 8); vR(col, x + 11, 95, 7, 7); vR(col, x + 11, 93, 2, 2); vR(col, x + 16, 93, 2, 2);
     vR(col, x - 4, 104 + Math.round(tail * .4), 5, 2); vR(col, x - 6, 101 + Math.round(tail), 2, 4);
   }
-  vR('#e8e0d0', 112, 102, 8, 6); vR('#c8b8a0', 120, 103, 2, 3); vR('#7a4a2a', 113, 103, 6, 1);
-  if (SHOW.effects) vSmoke(114, 100, t, 1);
   vR('#4a68a8', 196, 104, 16, 4); vR('#f4efe0', 197, 103, 14, 1); vR('#a84a4a', 214, 105, 12, 3);
-  T.passengers.forEach((p, i) => { if (p) tPerson(p, T_SEATS[i], t, rock, dark); });
+  const faces = T_SEATS.map(() => 0);
+  T_PAIRS.forEach(([a, b], k) => { const pa = T.passengers[a], pb = T.passengers[b]; if (pa && pb && pa.rise === 1 && pb.rise === 1 && !pa.leaving && !pb.leaving && (T.pairs[k].game || T.pairs[k].say)) { faces[a] = 1; faces[b] = -1; } });
+  T.passengers.forEach((p, i) => { if (p) tPerson(p, T_SEATS[i], t, rock, dark, faces[i]); });
   T_SEATS.forEach(x => {
-    vR('#2a1a10', x - 22, 150, 44, 30); vR('#7a2a34', x - 21, 151, 42, 29); vR('#94384a', x - 21, 151, 42, 3);
-    for (let a = 0; a < 3; a++) vR('#5e1e28', x - 14 + a * 14, 155, 1, 25);
+    vR('#2a1a10', x - 22, 150, 44, 30); vR(jp ? '#3a5a9a' : '#7a2a34', x - 21, 151, 42, 29); vR(jp ? '#4a6cb0' : '#94384a', x - 21, 151, 42, 3);
+    if (jp) vR('#f0eee4', x - 13, 151, 26, 8); else for (let a = 0; a < 3; a++) vR('#5e1e28', x - 14 + a * 14, 155, 1, 25);
   });
+  T_PAIRS.forEach((_, k) => tTable(k, t));
   if (t > T.conductor && t < T.conductor + 16) {
     const x = -20 + (t - T.conductor) / 16 * 360, y = 128 + Math.abs(Math.sin(t * 5)) * 2;
     vR('#22304e', x - 13, y + 13, 26, 40); vR('#22304e', x - 11, y - 12, 22, 7); vR('#b8924a', x - 11, y - 6, 22, 1);
@@ -3944,21 +4103,19 @@ function drawTrain(t, dt) {
     vR('#ffd060', x + 14, y + 20, 3, 4);
   }
   if (SHOW.lights) {
-    qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = lamp * (.2 + dark * .2);
-    qc.drawImage(qTint('#ffb860'), 90, 40, 140, 100);
+    qc.globalCompositeOperation = 'lighter'; qc.globalAlpha = (jp ? .12 : .55 + A.bass * .25) * (.2 + dark * .2);
+    qc.drawImage(qTint(jp ? '#dce8ff' : '#ffb860'), 40, 30, 240, 120);
     qc.globalAlpha = 1; qc.globalCompositeOperation = 'source-over';
   }
-
-  const s = Math.min(W / QW, H / QH), ox = (W - QW * s) / 2, oy = (H - QH * s) / 2 + Math.round(rock * Math.sin(t * 7) * .35) * s * .4, P = v => v * s;
-  c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
-  c.imageSmoothingEnabled = false;
-  c.drawImage(qLow, ox, oy, QW * s, QH * s);
-  c.imageSmoothingEnabled = true;
-  const text = (str, x, y, size, col, align = 'left') => {
-    c.fillStyle = col; c.textAlign = align; c.font = `${P(size)}px VT323, monospace`;
-    c.fillText(str, ox + P(x), oy + P(y));
-  };
-  if (T.signX != null) text(T.line[T.at === undefined ? 0 : T.stop > 0 || T.leg < 12 ? T.at : tNext()].toUpperCase(), T.signX, 60, 8.5, '#f0e4c0', 'center');
+  const ui = cozyPresent(), { text } = ui, P = ui.P, ox = ui.ox, oy = ui.oy;
+  if (T.signX != null) text(T.line[T.stop > 0 || T.leg < 12 ? T.at : tNext()].toUpperCase(), T.signX, 60, 8.5, '#f0e4c0', 'center');
+  if (jp) {
+    c.fillStyle = '#080808'; c.fillRect(ox + P(112), oy + P(21), P(96), P(9));
+    c.save(); c.beginPath(); c.rect(ox + P(112), oy + P(21), P(96), P(9)); c.clip();
+    const led = `NEXT: ${T.line[tNext()].toUpperCase()}   ${T.view.name}   PLEASE MIND THE DOORS   `;
+    text(led + led, 112 - (t * 18 % (led.length * 3.25)), 28, 7, '#ffa030');
+    c.restore();
+  }
   if (SHOW.stats) {
     const left = 18, right = 302, n = T.line.length, gap = (right - left) / n, pos = left + gap * (T.at + (T.stop > 0 ? 0 : T.leg / T_LEG));
     c.fillStyle = '#b8924a'; c.fillRect(ox + P(left), oy + P(7.6), P(right - left), P(.8));
@@ -3969,26 +4126,351 @@ function drawTrain(t, dt) {
     c.fillStyle = '#ff7a4a'; c.beginPath(); c.arc(ox + P(pos), oy + P(8), P(2), 0, 7); c.fill();
     text(`${Math.floor(T.km).toLocaleString('en-US')} KM`, 318, 5.5, 5.2, '#a89a78', 'right');
   }
+  T.pairs.forEach(pair => {
+    if (!pair.say || t > pair.say.until) return;
+    const x = T_SEATS[pair.say.who], width = Math.max(30, pair.say.text.length * 3.3 + 8), bx = clamp(x - width / 2, 3, QW - width - 3);
+    ui.win(bx, 112, width, 10);
+    text(pair.say.text, bx + width / 2, 119.5, 7, '#4a3826', 'center');
+  });
   if (t > T.nextNews) {
     const folk = T.passengers.filter(Boolean), a = folk[Math.floor(rnd(0, folk.length))]?.name ?? 'the conductor';
-    const vars = { person: a, next: T.line[tNext()], region: T.region.toLowerCase(), km: Math.floor(T.km) };
-    const line = chatExpand('train').replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? key).replace(/ {2,}/g, ' ').trim();
-    tNews(line[0].toUpperCase() + line.slice(1), t);
+    tNews(cozyLine('train', { person: a, next: T.line[tNext()], region: T.view.name.toLowerCase(), km: Math.floor(T.km) }), t);
   }
-  if (SHOW.log && T.news) {
-    c.fillStyle = 'rgba(246,236,214,.94)'; c.fillRect(ox + P(3), oy + P(QH - 15), P(256), P(12));
-    c.strokeStyle = '#6a5238'; c.lineWidth = P(.8); c.strokeRect(ox + P(3), oy + P(QH - 15), P(256), P(12));
-    text('LOG', 7, QH - 7, 7, '#8a3a2a');
-    text(T.news, 22, QH - 7, 7.5, '#4a3826');
-  }
+  if (SHOW.log && T.news) { ui.win(3, QH - 15, 256, 12); text('LOG', 7, QH - 7, 7, '#8a3a2a'); text(T.news, 22, QH - 7, 7.5); }
   if (SHOW.banners && T.banner && t - T.banner.at < 4) {
     const age = t - T.banner.at;
     c.globalAlpha = clamp(Math.min(age * 2, (4 - age) * 2));
-    c.fillStyle = 'rgba(24,16,10,.88)'; c.fillRect(ox + P(QW / 2 - 66), oy + P(22), P(132), P(15));
-    text(`NOW ARRIVING: ${T.banner.text}`, QW / 2, 32.5, 7.5, '#ffe090', 'center');
+    c.fillStyle = 'rgba(24,16,10,.88)'; c.fillRect(ox + P(QW / 2 - 76), oy + P(22), P(152), P(15));
+    text(T.banner.raw ? T.banner.text : `NOW ARRIVING: ${T.banner.text}`, QW / 2, 32.5, 7.5, '#ffe090', 'center');
     c.globalAlpha = 1;
   }
 }
+
+/* THE GAME: four friends, top down, playing something nobody can explain. */
+const G_SAVE = 'winvamp.game';
+const G_COLS = ['#d84a3a', '#3a78d8', '#e0b030', '#40a860', '#a050c8', '#e87a30', '#30b0b0', '#e870a8'];
+const G_PIECES = ['pawn', 'house', 'spoon', 'frog', 'teeth', 'egg', 'cube', 'hat'];
+const G_SEATS = [[160, 170, -Math.PI / 2], [298, 88, Math.PI], [160, 6, Math.PI / 2], [22, 88, 0]];
+const G_NAMES = ['red', 'blue', 'gold', 'green', 'purple', 'orange', 'teal', 'pink'];
+const G_PROPS = ['spoon', 'goose', 'keyboard', 'moon', 'teapot', 'crown', 'boot', 'lantern', 'fish', 'bishop'];
+const G_PLAYS = { roll: 'ROLLS', hop: 'HOPS', draw: 'DRAWS', grab: 'GOES FOR', shove: 'SHOVES' };
+const G_EVENTS = ['spin', 'flood', 'seats', 'sun', 'multiply', 'tilt', 'frog', 'dice', 'invert', 'eye', 'hand', 'cards', 'reshape', 'units'];
+const G = { ready: false, name: '', games: 0, wild: 0, players: [], pieces: [], tiles: 26, rot: 0, shapeA: 0, shapeB: 1, morph: 1, turn: 0, next: 3, die: null, card: null, say: null, fx: {}, unit: 'POINTS', news: '', nextNews: 6, banner: null, seatRot: 0, dice: [], finale: 0, t: 0, nextGame: 0, palette: 0, who: 0, dir: 1, primed: false, skip: [0, 0, 0, 0], rules: [], ruleNo: 0, props: [], plays: [], tc: [], cols: [], act: '', readIx: 0, fired: 0 };
+
+function gSeat(i, t) {
+  const [x, y, a] = G_SEATS[i], cx = 160, cy = 88, spin = G.seatRot;
+  const ca = Math.cos(spin), sa = Math.sin(spin), dx = x - cx, dy = (y - cy) * 1;
+  return [cx + dx * ca - dy * sa, cy + dx * sa + dy * ca, a + spin];
+}
+
+function gNew(t) {
+  const names = ['MO', 'TESS', 'BIG DAN', 'PRIYA', 'OLU', 'KIT', 'SANA', 'GREG', 'IVY', 'LOU'].sort(() => Math.random() - .5);
+  G.name = chatExpand('bg_name').toUpperCase(); G.wild = 0; G.seatRot = 0; G.rot = 0; G.fx = {}; G.dice = []; G.finale = 0; G.palette = Math.floor(rnd(0, 8));
+  G.unit = chatExpand('bg_unit').toUpperCase(); G.morph = 1; G.shapeA = G.shapeB = Math.floor(rnd(0, 6)); G.card = null; G.say = null; G.turn = 0; G.next = t + 3;
+  G.tiles = 18 + Math.floor(rnd(0, 11)) * 1; G.who = 0; G.dir = 1; G.primed = false; G.skip = [0, 0, 0, 0]; G.rules = []; G.ruleNo = 0; G.act = ''; G.readIx = 0;
+  // Each game deals its own board, prop box and list of legal plays.
+  G.cols = [0, 1, 2, 3, 4, 5, 6, 7].sort(() => Math.random() - .5).slice(0, 3 + Math.floor(rnd(0, 2)));
+  const paint = Math.floor(rnd(0, 3));
+  G.tc = Array.from({ length: G.tiles }, (_, i) => G.cols[paint === 0 ? i % G.cols.length : paint === 1 ? Math.floor(i / 4) % G.cols.length : Math.floor(rnd(0, G.cols.length))]);
+  G.feltRound = Math.random() < .6;
+  const box = [...G_PROPS].sort(() => Math.random() - .5).slice(0, 2 + Math.floor(rnd(0, 2)));
+  G.props = box.map(kind => ({ kind, tile: Math.floor(rnd(0, G.tiles)), holder: -1 }));
+  G.plays = ['roll', ...['roll', 'hop', 'draw', 'grab', 'shove'].sort(() => Math.random() - .5).slice(0, 2)];
+  G.players = names.slice(0, 4).map((name, i) => ({ name, score: 0, hair: V_HAIR[Math.floor(rnd(0, V_HAIR.length))], shirt: G_COLS[(i * 2 + G.palette) % 8], skin: ['#f4d0b0', '#ecc4a2', '#d8a878', '#b07a50', '#8a5a3a'][Math.floor(rnd(0, 5))], cards: 3 + Math.floor(rnd(0, 4)), reach: 0 }));
+  G.pieces = G.players.map((_, i) => ({ owner: i, kind: G_PIECES[Math.floor(rnd(0, G_PIECES.length))], at: i * 6, from: i * 6, to: i * 6, q: 1 }));
+  G.banner = { text: `NEW GAME: ${G.name}`, at: t };
+  for (let i = 0; i < 3; i++) gAddRule();
+  G.news = `Legal plays: ${[...new Set(G.plays)].map(k => k).join(', ')}.`; G.nextNews = t + 8;
+}
+
+// Expands the grammar, then reads the ~tags~ out of the sentence to build the rule's behaviour.
+function gMakeRule() {
+  const pick = l => l[Math.floor(rnd(0, l.length))];
+  for (let i = 0; i < 30; i++) {
+    const r = { fired: 0, flash: 0 };
+    const colour = () => pick([...new Set(G.tc)]);
+    const text = chatExpand('gr_rule').replace(/~(\w+)(?::(\w+))?(?::(\w+))?~/g, (_, key, a, b) => {
+      if (key === 'on') { r.on = a; return ''; }
+      if (key === 'do') { r.do = a; r.ev = b; return ''; }
+      if (key === 'col') { r.col = colour(); return G_NAMES[r.col]; }
+      if (key === 'col2') { r.col2 = (G.cols.filter(k => k !== r.col)[0]) ?? r.col; return G_NAMES[r.col2]; }
+      if (key === 'prop') { r.prop = pick(G.props).kind; return r.prop; }
+      if (key === 'n') { const [word, n] = pick([['one', 1], ['two', 2], ['three', 3], ['five', 5], ['nine', 9]]); r.n = n; return word; }
+      if (key === 'unit') return G.unit.toLowerCase();
+      return '';
+    }).replace(/ {2,}/g, ' ').trim();
+    if (text.length <= 74 && r.on && r.do && !G.rules.some(o => o.text === text)) return { ...r, text };
+  }
+  return null;
+}
+
+function gAddRule() {
+  const r = gMakeRule();
+  if (!r) return null;
+  r.n0 = ++G.ruleNo;
+  G.rules.push(r);
+  if (G.rules.length > 8) G.rules.shift();
+  return r;
+}
+
+const gLeader = () => G.players.reduce((best, p, i) => (p.score > G.players[best].score ? i : best), 0);
+const gLast = () => G.players.reduce((best, p, i) => (p.score < G.players[best].score ? i : best), 0);
+const gMine = who => G.pieces.filter(k => k.owner === who);
+function gShift(piece, by) { piece.from = piece.at; piece.to = ((piece.at + by) % G.tiles + G.tiles) % G.tiles; piece.q = 0; piece.main = false; }
+
+function gObey(r, who, t) {
+  const p = G.players[who], lead = gLeader(), low = gLast(), piece = gMine(who)[0], prop = G.props.find(k => k.kind === r.prop);
+  switch (r.do) {
+    case 'gain': p.score += r.n; break;
+    case 'lose': p.score -= r.n; break;
+    case 'steal': G.players[lead].score -= r.n; p.score += r.n; break;
+    case 'fwd': if (piece) gShift(piece, r.n); break;
+    case 'back': if (piece) gShift(piece, -r.n); break;
+    case 'skip': G.skip[who]++; break;
+    case 'extra': G.extra = true; break;
+    case 'reverse': G.dir *= -1; break;
+    case 'give': if (prop) { prop.holder = low; } break;
+    case 'spawn': G.props.push({ kind: r.prop, tile: Math.floor(rnd(0, G.tiles)), holder: -1 }); if (G.props.length > 9) G.props.shift(); break;
+    case 'recolour': G.tc = G.tc.map(k => (k === r.col ? r.col2 : k)); break;
+    case 'cards': p.cards = Math.min(9, p.cards + r.n); break;
+    case 'swap': { const a = gMine(who)[0], b = gMine(lead)[0]; if (a && b && a !== b) { const at = a.at; gShift(a, b.at - a.at); gShift(b, at - b.at); } break; }
+    case 'repeal': if (G.rules.length > 2) { const others = G.rules.filter(o => o !== r); G.rules.splice(G.rules.indexOf(others[Math.floor(rnd(0, others.length))]), 1); } break;
+    case 'write': gAddRule(); break;
+    case 'ev': gEvent(t, r.ev); break;
+  }
+}
+
+function gCheck(type, who, t, ctx = {}) {
+  const hit = G.rules.filter(r => {
+    if (r.on !== type) return false;
+    if (type === 'land') return ctx.col === r.col;
+    if (type === 'landprop') return ctx.props?.includes(r.prop);
+    if (type === 'hold') return G.props.some(k => k.kind === r.prop && k.holder === who);
+    return true;
+  });
+  if (!hit.length) return false;
+  const r = hit[Math.floor(rnd(0, hit.length))];
+  r.fired++; r.flash = t + 3.2; G.fired++;
+  gObey(r, who, t);
+  G.card = { head: `RULE ${r.n0} TRIGGERED: ${G.players[who].name}`, text: r.text, until: t + 3.4 };
+  G.say = { who: (who + 1 + Math.floor(rnd(0, 3))) % 4, text: chatExpand('bg_say').replace('{name}', G.players[who].name.toLowerCase()).replace('{rule}', r.n0), until: t + 3 };
+  G.wild = Math.min(1, G.wild + .014);
+  G.next = Math.max(G.next, t + 3.5);
+  return true;
+}
+
+function gLand(piece, t) {
+  const who = piece.owner, tile = piece.at, here = G.props.filter(k => k.holder < 0 && k.tile === tile);
+  here.forEach(k => { k.holder = who; });
+  if (here.length) G.act = `${G.players[who].name} TAKES THE ${here[0].kind.toUpperCase()}`;
+  const shared = G.pieces.some(k => k !== piece && k.at === tile);
+  (piece.lap && gCheck('lap', who, t)) || gCheck('landprop', who, t, { props: here.map(k => k.kind) }) || (shared && gCheck('share', who, t)) || gCheck('land', who, t, { col: G.tc[tile] });
+  piece.lap = false;
+}
+
+function gStart(t) {
+  let saved = null;
+  try { saved = JSON.parse(store.get(G_SAVE) || 'null'); } catch {}
+  G.games = saved?.games || 0;
+  G.ready = true;
+  gNew(t);
+}
+
+function gTile(i, t) {
+  const shape = (kind, k) => {
+    const n = G.tiles, a = k / n * Math.PI * 2;
+    if (kind === 0) return [Math.cos(a) * 58, Math.sin(a) * 42];
+    if (kind === 1) { const r = 14 + k / n * 46; return [Math.cos(a * 2.4) * r, Math.sin(a * 2.4) * r * .74]; }
+    if (kind === 2) { const row = Math.floor(k / 7), col = k % 7; return [(row % 2 ? 6 - col : col) * 16 - 48, row * 20 - 30]; }
+    if (kind === 3) { const r = k % 2 ? 26 : 56; return [Math.cos(a) * r, Math.sin(a) * r * .76]; }
+    if (kind === 4) return [Math.sin(a) * 60, Math.sin(a * 2) * 36];
+    return [(k / n - .5) * 124, Math.sin(k * .9) * 36];
+  };
+  const [ax, ay] = shape(G.shapeA, i), [bx, by] = shape(G.shapeB, i), m = G.morph * G.morph * (3 - 2 * G.morph);
+  let x = ax + (bx - ax) * m, y = ay + (by - ay) * m;
+  const wob = G.wild * 5, rot = G.rot, cr = Math.cos(rot), sr = Math.sin(rot);
+  x += Math.sin(t * 1.3 + i) * wob; y += Math.cos(t * 1.1 + i * 2) * wob;
+  let px = x * cr - y * sr, py = x * sr + y * cr;
+  if (G.fx.sun > t) { const d = Math.hypot(px, py) || 1, a = Math.atan2(py, px) + t * .6; px = Math.cos(a) * d; py = Math.sin(a) * d * .8; }
+  if (G.fx.tilt > t) { px += Math.sin(t * 2) * 12 + (py * .3); py *= .7; }
+  if (G.finale) { const f = clamp((t - G.finale) / 5), a = Math.atan2(py, px) + f * 6; const d = Math.hypot(px, py) * (1 - f); px = Math.cos(a) * d; py = Math.sin(a) * d; }
+  return [160 + px, 88 + py];
+}
+
+function gEvent(t, kind) {
+  const dur = { spin: 8, flood: 12, sun: 12, tilt: 9, frog: 11, invert: 1.4, eye: 9, hand: 9, cards: 8, dice: 6 }[kind] || 0;
+  if (dur) G.fx[kind] = t + dur;
+  if (kind === 'seats') { G.fx.seatGoal = G.seatRot + Math.PI / 2 * (Math.random() < .5 ? 1 : 2); }
+  if (kind === 'multiply' && G.pieces.length < 26) { for (const p of [...G.pieces].slice(0, 5)) G.pieces.push({ ...p, kind: G_PIECES[Math.floor(rnd(0, G_PIECES.length))], at: Math.floor(rnd(0, G.tiles)), q: 1 }); for (const p of G.pieces) { p.to = p.from = p.at; } }
+  if (kind === 'reshape') { G.shapeA = G.shapeB; G.shapeB = (G.shapeB + 1 + Math.floor(rnd(0, 5))) % 6; G.morph = 0; }
+  if (kind === 'units') { G.unit = chatExpand('bg_unit').toUpperCase(); }
+  if (kind === 'dice') G.dice = Array.from({ length: 24 }, () => ({ x: rnd(70, 250), y: rnd(-60, 0), v: rnd(30, 70), rest: rnd(40, 136) }));
+  G.news = chatExpand(`bg_ev_${kind}`); G.news = G.news[0].toUpperCase() + G.news.slice(1); G.nextNews = t + 10;
+}
+
+function gStep(t) {
+  const who = G.who, p = G.players[who], others = G.pieces.filter(k => k.owner !== who);
+  const advance = () => {
+    if (G.extra) G.extra = false; else G.who = (who + G.dir + 4) % 4;
+    G.primed = false;
+  };
+  if (G.skip[who] > 0) { G.skip[who]--; G.act = `${p.name} IS SKIPPED`; advance(); G.next = t + 1.5; return; }
+  if (!G.primed) {
+    G.primed = true;
+    if (gCheck('hold', who, t) || (who === gLeader() && gCheck('lead', who, t)) || (who === gLast() && gCheck('last', who, t)) || (p.cards >= 5 && gCheck('cards', who, t))) return;
+  }
+  const piece = gMine(who)[Math.floor(rnd(0, gMine(who).length))] || G.pieces[0], play = G.plays[Math.floor(rnd(0, G.plays.length))];
+  const go = by => { piece.from = piece.at; piece.to = piece.at + by; piece.q = 0; piece.main = true; piece.lap = piece.at + by >= G.tiles; };
+  p.reach = 1;
+  G.next = t + rnd(2.4, 3.2) - G.wild * .9;
+  if (play === 'roll') {
+    const roll = 1 + Math.floor(rnd(0, 6));
+    G.die = { x: gSeat(who, t)[0] * .5 + 80, y: gSeat(who, t)[1] * .5 + 44, until: t + 1.8 };
+    G.act = `${p.name} ROLLS ${roll}`;
+    go(roll);
+    gCheck(roll >= 5 ? 'rollhigh' : roll <= 2 ? 'rolllow' : 'none', who, t) || (roll % 2 && gCheck('rollodd', who, t));
+  } else if (play === 'hop') { G.act = `${p.name} HOPS 2`; go(2); }
+  else if (play === 'draw') { p.cards = Math.min(9, p.cards + 1); G.act = `${p.name} DRAWS A CARD`; go(1); gCheck('draw', who, t); }
+  else if (play === 'grab') {
+    const loose = G.props.filter(k => k.holder < 0), near = loose.sort((a, b) => ((a.tile - piece.at + G.tiles) % G.tiles) - ((b.tile - piece.at + G.tiles) % G.tiles))[0];
+    if (near) { G.act = `${p.name} GOES FOR THE ${near.kind.toUpperCase()}`; go(((near.tile - piece.at + G.tiles) % G.tiles) || G.tiles); }
+    else { G.act = `${p.name} HOPS 3`; go(3); }
+  } else {
+    const foe = others[Math.floor(rnd(0, others.length))];
+    if (foe) { gShift(foe, -2); G.act = `${p.name} SHOVES ${G.players[foe.owner].name}`; } else go(1);
+  }
+  G.wild = Math.min(1, G.wild + rnd(.008, .014));
+  if (Math.random() < .3) G.say = { who: Math.floor(rnd(0, 4)), text: chatExpand('bg_say').replace('{name}', p.name.toLowerCase()).replace('{rule}', Math.max(1, G.ruleNo - Math.floor(rnd(0, 3)))), until: t + 3 };
+  if (G.turn % 5 === 4) { const r = gAddRule(); if (r) { G.card = { head: `NEW RULE ${r.n0}`, text: r.text, until: t + 4 }; r.flash = t + 3.2; G.next = Math.max(G.next, t + 3.6); } }
+  if (Math.random() < G.wild * .12) gEvent(t, G_EVENTS[Math.floor(rnd(0, G_EVENTS.length))]);
+  G.turn++;
+  advance();
+  if (G.wild >= 1 && !G.finale) {
+    const champ = G.players[gLeader()];
+    G.finale = t; G.next = t + 1e6; G.banner = { text: `${champ.name} WINS, PROBABLY`, at: t };
+    G.news = chatExpand('bg_end'); G.news = G.news[0].toUpperCase() + G.news.slice(1); G.nextNews = t + 12; G.nextGame = t + 8; G.games++; store.set(G_SAVE, JSON.stringify({ games: G.games }));
+  }
+}
+
+function gUpdate(t, dt) {
+  G.t = t;
+  if (!G.ready) gStart(t);
+  if (G.nextGame && t > G.nextGame) { G.nextGame = 0; gNew(t); return; }
+  if (t > G.next) gStep(t);
+  G.morph = Math.min(1, G.morph + dt * .25);
+  G.rot += dt * (G.fx.spin > t ? 1.6 : .02 + G.wild * .12);
+  if (G.fx.seatGoal !== undefined) { const d = G.fx.seatGoal - G.seatRot; if (Math.abs(d) < .01) { G.seatRot = G.fx.seatGoal; delete G.fx.seatGoal; } else G.seatRot += Math.sign(d) * Math.min(Math.abs(d), dt * 1.2); }
+  for (const p of G.pieces) if (p.q < 1) { p.q += dt * 1.1; if (p.q >= 1) { p.q = 1; p.at = p.to % G.tiles; p.to = p.at; p.from = p.at; if (p.main) { p.main = false; gLand(p, t); } } }
+  for (const p of G.players) p.reach = Math.max(0, p.reach - dt * .8);
+  G.dice.forEach(d => { if (d.y < d.rest) d.y += d.v * dt; });
+  if (!(G.fx.dice > t)) G.dice = [];
+}
+
+function gPiece(kind, x, y, col, t) {
+  const r = (c3, a, b, w, h) => vR(c3, x + a, y + b, w, h);
+  r('rgba(0,0,0,.25)', -3, 2, 7, 2);
+  if (kind === 'pawn') { r(col, -2, -2, 5, 4); r(col, -1, -6, 3, 4); }
+  else if (kind === 'house') { r(col, -3, -3, 7, 5); qPoly([[x - 4, y - 3], [x + .5, y - 7], [x + 5, y - 3]], '#b83a2a'); }
+  else if (kind === 'spoon') { r('#c8c8d4', -1, -7, 2, 9); r('#e4e4ec', -2, -9, 4, 3); }
+  else if (kind === 'frog') { r('#50b050', -3, -3, 7, 5); r('#50b050', -3, -5, 2, 2); r('#50b050', 2, -5, 2, 2); r('#000', -3, -5, 1, 1); r('#000', 3, -5, 1, 1); }
+  else if (kind === 'teeth') { r('#f4f0e6', -3, -3, 7, 5); r('#000', -3, -1, 7, 1); for (let i = 0; i < 3; i++) r('#b0a890', -2 + i * 2, -3, 1, 5); }
+  else if (kind === 'egg') { qOval(x, y - 2, 3, 4, '#f4ead0'); r(col, -1, -3, 2, 1); }
+  else if (kind === 'cube') { r(col, -3, -4, 6, 6); r('rgba(255,255,255,.35)', -3, -4, 6, 1); }
+  else { r('#2a2a34', -3, -1, 7, 2); r('#2a2a34', -2, -6, 5, 5); r(col, -2, -3, 5, 1); }
+}
+
+function gProp(kind, x, y, t) {
+  const r = (col, a, b, w, h) => vR(col, x + a, y + b, w, h);
+  r('rgba(0,0,0,.28)', -5, 3, 11, 2);
+  if (kind === 'spoon') { r('#c8c8d4', -1, -6, 2, 9); r('#e8e8f0', -2, -9, 4, 4); }
+  else if (kind === 'goose') { r('#f4f4ec', -4, -3, 8, 5); r('#f4f4ec', 3, -8, 2, 6); r('#f4f4ec', 3, -9, 3, 2); r('#e8a030', 6, -8, 2, 1); }
+  else if (kind === 'keyboard') { r('#30303c', -7, -3, 14, 7); for (let a = 0; a < 3; a++) for (let b = 0; b < 6; b++) r(Math.sin(t * 5 + a * 3 + b) > .75 ? '#7dff5a' : '#c8c8d4', -6 + b * 2, -2 + a * 2, 1, 1); }
+  else if (kind === 'moon') { qOval(x, y - 2, 6, 6, '#f0ecd0'); qOval(x + 2, y - 3, 5, 5, '#2a2436'); }
+  else if (kind === 'teapot') { r('#d8d0e8', -4, -4, 8, 6); r('#d8d0e8', 4, -3, 3, 2); r('#b8b0c8', -6, -3, 2, 3); r('#b8b0c8', -1, -6, 2, 2); }
+  else if (kind === 'crown') { r('#f0c840', -4, -3, 9, 5); r('#f0c840', -4, -6, 2, 3); r('#f0c840', 0, -7, 2, 4); r('#f0c840', 3, -6, 2, 3); r('#d83a3a', -1, -2, 2, 2); }
+  else if (kind === 'boot') { r('#7a4a2a', -3, -7, 5, 9); r('#7a4a2a', -3, 0, 9, 3); r('#4a2c18', -3, 2, 9, 1); }
+  else if (kind === 'lantern') { r('#3a3a44', -3, -6, 7, 1); r('#ffd060', -2, -5, 5, 6); r('#3a3a44', -3, 1, 7, 1); r('#fff0b0', -1, -4, 2, 3); }
+  else if (kind === 'fish') { r('#40a0d0', -5, -2, 9, 4); r('#40a0d0', 4, -3, 2, 6); r('#fff', -4, -1, 1, 1); }
+  else { r('#f4efe0', -3, 0, 7, 3); r('#f4efe0', -2, -6, 5, 6); r('#d83a3a', -1, -9, 3, 3); }
+}
+
+function drawBoardGame(t, dt) {
+  gUpdate(t, dt);
+  const wild = G.wild, invert = G.fx.invert > t;
+  qc.fillStyle = '#3a2c3c'; qc.fillRect(0, 0, QW, QH);
+  for (let i = 0; i < 14; i++) vR('#332636', 0, i * 14, QW, 1);
+  qOval(160, 90, 158, 90, '#5a3a4a'); qOval(160, 90, 150, 84, '#6a4656');
+  qc.fillStyle = '#000'; qc.globalAlpha = .3; qc.beginPath(); qc.roundRect(52, 16, 220, 148, 14); qc.fill(); qc.globalAlpha = 1;
+  qc.fillStyle = '#7a4a2a'; qc.beginPath(); qc.roundRect(48, 12, 224, 148, 14); qc.fill();
+  qc.fillStyle = '#8a5a34'; qc.beginPath(); qc.roundRect(52, 16, 216, 140, 11); qc.fill();
+  for (let i = 0; i < 9; i++) vR('#80512e', 54, 22 + i * 15, 212, 1);
+  const felt = G.fx.flood > t ? '#2a6aa8' : tRgb(tMix(tHex(G_COLS[G.palette]), [30, 30, 40], .6));
+  if (G.feltRound) { qOval(160, 88, 86, 66, '#1a1420'); qOval(160, 88, 83, 63, felt); } else { qc.fillStyle = '#1a1420'; qc.beginPath(); qc.roundRect(78, 25, 164, 126, 6); qc.fill(); qc.fillStyle = felt; qc.beginPath(); qc.roundRect(81, 28, 158, 120, 5); qc.fill(); }
+  if (G.fx.flood > t) { for (let i = 0; i < 40; i++) vR('rgba(190,230,250,.6)', 100 + (i * 37 + t * 8) % 120, 40 + (i * 23) % 96, 5, 1); qPoly([[150, 60 + Math.sin(t) * 2], [172, 60 + Math.sin(t) * 2], [168, 66 + Math.sin(t) * 2], [154, 66 + Math.sin(t) * 2]], '#a86a3a'); vR('#f4efe0', 160, 50 + Math.sin(t) * 2, 1, 10); qPoly([[161, 50 + Math.sin(t) * 2], [168, 58 + Math.sin(t) * 2], [161, 58 + Math.sin(t) * 2]], '#f4efe0'); }
+  for (let i = 0; i < G.tiles; i++) {
+    const [x, y] = gTile(i, t), col = G_COLS[G.tc[i] ?? 0], s = 5 + Math.round(Math.sin(t * 2 + i) * wild * 2);
+    vR('#141018', x - s - 1, y - s - 1, s * 2 + 2, s * 2 + 2); vR(col, x - s, y - s, s * 2, s * 2);
+    if (i % 4 === 0) vR('#fff', x - 1, y - 1, 2, 2);
+    if (i % 5 === 2) { vR('#141018', x - 3, y, 6, 1); vR('#141018', x, y - 3, 1, 6); }
+    if (i % 7 === 3) { qOval(x, y, 3, 2, '#fff'); vR('#101014', x, y - 1, 1, 2); }
+  }
+  for (let i = 0; i < 2 + Math.floor(wild * 8); i++) { const a = t * (.3 + i * .1) + i, r = 16 + i * 5; vR(G_COLS[i & 7], 160 + Math.cos(a) * r, 88 + Math.sin(a) * r * .7, 3, 3); }
+  if (G.fx.sun > t) { qc.globalCompositeOperation = 'lighter'; qc.drawImage(qTint('#ffd060'), 124, 52, 72, 72); qc.globalCompositeOperation = 'source-over'; qc.fillStyle = '#ffe080'; qc.beginPath(); qc.arc(160, 88, 11, 0, 7); qc.fill(); }
+  if (G.fx.eye > t) { const look = Math.sin(t) * 7, open = Math.min(1, (G.fx.eye - t) / 1.5, Math.abs(Math.sin((G.fx.eye - t) * .9)) + .2); qOval(160, 88, 34, 20 * open, '#f4efe6'); qOval(160 + look, 88, 12 * open + 1, 12 * open, '#3a78b8'); qOval(160 + look, 88, 6 * open, 6 * open, '#080808'); vR('#fff', 156 + look, 83, 3, 3); }
+  for (const k of G.props) if (k.holder < 0) { const [x, y] = gTile(k.tile, t); gProp(k.kind, x, y, t); }
+  for (const p of G.pieces) {
+    const [ax, ay] = gTile(p.from % G.tiles, t), [bx, by] = gTile(p.to % G.tiles, t), hop = Math.sin(p.q * Math.PI) * 14;
+    gPiece(p.kind, ax + (bx - ax) * p.q, ay + (by - ay) * p.q - hop, G_COLS[(p.owner * 2 + G.palette) & 7], t);
+  }
+  if (G.fx.frog > t) { const a = 1 - (G.fx.frog - t) / 11, x = 40 + a * 240, y = 120 - Math.abs(Math.sin(a * 22)) * 26; qOval(x, y, 11, 8, '#50b050'); vR('#50b050', x - 10, y - 11, 6, 6); vR('#50b050', x + 4, y - 11, 6, 6); vR('#000', x - 8, y - 9, 2, 2); vR('#000', x + 6, y - 9, 2, 2); vR('#e85a6a', x - 6, y + 3, 12, 1); }
+  if (G.fx.hand > t) { const a = 1 - (G.fx.hand - t) / 9, reach = Math.sin(a * Math.PI) * 112, x = 200 + Math.sin(t) * 12; vR('#3a3448', x - 6, 0, 13, reach); vR('#b8b0c8', x - 8, reach, 17, 11); for (let i = 0; i < 4; i++) vR('#b8b0c8', x - 8 + i * 5, reach + 10, 3, 9); }
+  for (const d of G.dice) { vR('#f4f0e6', d.x, d.y, 7, 7); vR('#101014', d.x + 3, d.y + 3, 1, 1); vR('#101014', d.x + 1, d.y + 1, 1, 1); vR('#101014', d.x + 5, d.y + 5, 1, 1); }
+  if (G.fx.cards > t) for (let i = 0; i < 18; i++) { const a = t * 1.4 + i, r = 40 + (i * 7) % 60; qc.save(); qc.translate(160 + Math.cos(a) * r, 88 + Math.sin(a) * r * .75); qc.rotate(a * 2); vR('#f4efe0', -3, -4, 6, 8); vR(G_COLS[i & 7], -2, -3, 4, 3); qc.restore(); }
+  if (G.die && t < G.die.until) { const spin = (G.die.until - t) * 6; qc.save(); qc.translate(G.die.x, G.die.y); qc.rotate(spin); vR('#fff', -6, -6, 12, 12); vR('#14141c', -6, -6, 12, 1); qc.restore(); }
+  G.players.forEach((p, i) => {
+    const [x, y, a] = gSeat(i, t);
+    qc.save(); qc.translate(x, y); qc.rotate(a);
+    vR(p.shirt, -9, -16, 16, 32); qOval(0, 0, 11, 18, p.shirt);
+    const reach = p.reach * 26 + (i === G.who ? Math.sin(t * 3) * 2 : 0);
+    vR(p.shirt, 2, -18, 16 + reach, 6); vR(p.skin, 18 + reach, -18, 5, 6); vR(p.shirt, 2, 12, 14, 6); vR(p.skin, 16, 12, 5, 6);
+    for (let c2 = 0; c2 < p.cards; c2++) { const ang = (c2 - p.cards / 2) * .22; qc.save(); qc.translate(22, 14); qc.rotate(ang); vR('#f4efe0', 0, -2, 9, 5); vR(G_COLS[(c2 + i) & 7], 2, -1, 2, 2); qc.restore(); }
+    qOval(0, 0, 8, 8, p.hair); vR(p.skin, 6, -3, 3, 6); vR('rgba(255,255,255,.2)', -3, -4, 3, 3);
+    qc.restore();
+  });
+  G.props.forEach((k, i) => { if (k.holder < 0) return; const [x, y] = gSeat(k.holder, t); gProp(k.kind, 160 + (x - 160) * .72 + (i % 3) * 8 - 8, 88 + (y - 88) * .72 + (i % 2) * 6, t); });
+  G.rules.forEach((r, i) => { const x = 58 + i * 10, y = 136, hot = r.flash > t; vR(hot ? '#ffe080' : '#e8dcc4', x, y, 8, 12); vR('#8a3a2a', x + 1, y + 1, 6, 2); vR('#6a5238', x + 1, y + 5, 6, 1); vR('#6a5238', x + 1, y + 8, 5, 1); });
+  if (invert) { qc.globalCompositeOperation = 'difference'; qc.fillStyle = '#fff'; qc.fillRect(0, 0, QW, QH); qc.globalCompositeOperation = 'source-over'; }
+  if (G.fx.tilt > t) { qc.fillStyle = 'rgba(120,40,160,.14)'; qc.fillRect(0, 0, QW, QH); }
+  if (G.finale) { const f = clamp((t - G.finale) / 6); qc.fillStyle = `rgba(255,255,255,${f * .9})`; qc.fillRect(0, 0, QW, QH); }
+  const ui = cozyPresent(), { text, win } = ui;
+  if (SHOW.stats) {
+    win(3, 3, 76, 37);
+    text(G.name, 6, 9.5, Math.min(5.6, 72 / (G.name.length * .46)), '#8a3a2a');
+    G.players.forEach((p, i) => text(`${p.name} ${p.score} ${i === G.who ? '<' : ''}`, 6, 16 + i * 6, 6, G_COLS[(i * 2 + G.palette) & 7] === '#e0b030' ? '#8a6a10' : '#4a3826'));
+    text(`IN ${G.unit}`, 6, 38.5, 5.2, '#7a6a58');
+    win(241, 3, 76, 11);
+    text('CHAOS', 245, 10.5, 6, '#8a3a2a');
+    c.fillStyle = '#d8c8a8'; c.fillRect(ox_(ui, 268), oy_(ui, 6), ui.P(46), ui.P(5));
+    c.fillStyle = wild > .7 ? '#d83a3a' : '#e0a030'; c.fillRect(ox_(ui, 268), oy_(ui, 6), ui.P(46 * wild), ui.P(5));
+    if (G.act) { win(211, 16, 106, 11); text(G.act, 264, 23.5, 7, '#4a3826', 'center'); }
+  }
+  if (G.card && t < G.card.until && !G.finale) {
+    const words = G.card.text.toUpperCase().split(' '), half = Math.ceil(words.length / 2), a = words.slice(0, half).join(' '), b = words.slice(half).join(' '), width = Math.max(a.length * 3.6, b.length * 3.6, G.card.head.length * 3.1) + 14, age = t - (G.card.until - 3.4), pop = clamp(age * 4);
+    c.globalAlpha = pop;
+    win(160 - width / 2, 72, width, 30);
+    text(G.card.head, 160, 79.5, 5.6, '#8a3a2a', 'center');
+    text(a, 160, 88, 7.5, '#4a3826', 'center'); text(b, 160, 96, 7.5, '#4a3826', 'center');
+    c.globalAlpha = 1;
+  }
+  if (G.say && t < G.say.until) {
+    const [x, y] = gSeat(G.say.who, t), width = Math.max(34, G.say.text.length * 3.3 + 8), bx = clamp(x - width / 2, 3, QW - width - 3), by = clamp(y - 8, 16, 150);
+    win(bx, by, width, 10);
+    text(G.say.text, bx + width / 2, by + 7.4, 7, '#4a3826', 'center');
+  }
+  if (t > G.nextNews && G.rules.length) { const r = G.rules[G.readIx++ % G.rules.length]; G.news = `Rule ${r.n0}: ${r.text}.`; G.nextNews = t + 7; }
+  cozyPanels(ui, G, 'RULEBOOK', t);
+}
+const ox_ = (ui, v) => ui.ox + ui.P(v), oy_ = (ui, v) => ui.oy + ui.P(v);
 
 /* ALMANAC FARM: one farmer works a saved farm through a 40 minute year. */
 const F_SAVE = 'winvamp.farm', F_DAY = 100, F_SEASON_DAYS = 6;
@@ -4722,7 +5204,7 @@ const CLASSICS = [
   ['SUNSET', drawSunset, 'chill'], ['AURORA', drawAurora, 'chill'], ['HEARTH', drawHearth, 'chill'], ['RAIN', drawRain, 'chill'],
   ['LAVA', drawLava, 'chill'], ['KOI', drawKoi, 'chill'], ['PEAKS', drawPeaks, 'chill'], ['STARS', drawStarry, 'chill'],
   ['8-BIT QUEST', drawQuest, 'chill'], ['POCKET VILLAGE', drawVillage, 'chill'], ['NIGHT TRAIN', drawTrain, 'chill'], ['ALMANAC FARM', drawFarm, 'chill'],
-  ['LONG SAIL', drawSail, 'chill'], ['REEF TANK', drawReef, 'chill'], ['CORNER CAFE', drawCafe, 'chill'],
+  ['LONG SAIL', drawSail, 'chill'], ['REEF TANK', drawReef, 'chill'], ['CORNER CAFE', drawCafe, 'chill'], ['THE GAME', drawBoardGame, 'chill'],
 ];
 
 // Each shuffle plays everything once before repeating.
@@ -4860,6 +5342,7 @@ addEventListener('pointermove', wakeDock);
 addEventListener('pointerdown', wakeDock);
 $('dockFlip').onclick = () => setDockBottom(!document.body.classList.contains('dock-bottom'));
 $('dockPin').onclick = () => setDockPin(!dockPinned);
+$('trainLine').onclick = tCycleMode;
 $('newVillage').onclick = () => { if (confirm('Start a new village? The current one will be lost.')) vStart(true); };
 $('dockHide').onclick = () => { dockQuiet = clock + 1.2; document.body.classList.add('dock-away'); };
 $('mainHide').onclick = () => setParty(true);
@@ -5005,12 +5488,13 @@ if (startMode.has('farm')) setClassic(CLASSICS.findIndex(([, draw]) => draw === 
 if (startMode.has('sail')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawSail));
 if (startMode.has('reef')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawReef));
 if (startMode.has('cafe')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawCafe));
+if (startMode.has('game')) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawBoardGame));
 // Opens on the village unless the link asks for something else; ?spooky opens the graveyard.
-if (!['chill', 'quest', 'village', 'train', 'farm', 'sail', 'reef', 'cafe', 'spooky'].some(k => startMode.has(k))) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVillage));
+if (!['chill', 'quest', 'village', 'train', 'farm', 'sail', 'reef', 'cafe', 'game', 'spooky'].some(k => startMode.has(k))) setClassic(CLASSICS.findIndex(([, draw]) => draw === drawVillage));
 
 document.fonts?.load('40px Creepster');
 requestAnimationFrame(frame);
-window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, T_REGIONS, qNewParty, F, fUpdate, S, sUpdate, R, rUpdate, R_FISH, K, kUpdate };
+window.ghoulamp = { audio: A, setScene, shuffleStep, mz, q, questUpdate, chat, chatLine, chatRules: CHAT_RULES, chatExpand, CHAT_RULE_FOR, questChatVars, SHOW, V, vUpdate, vStart, vCatchUp, vRoute, vOpen, vSyncPeople, T, tUpdate, tCycleMode, G, gUpdate, gMakeRule, qNewParty, F, fUpdate, S, sUpdate, R, rUpdate, R_FISH, K, kUpdate };
 </script>
 </body>
 </html>
